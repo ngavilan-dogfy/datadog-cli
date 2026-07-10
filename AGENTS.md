@@ -33,29 +33,57 @@ The JSON has this shape:
 {
   "generated_at": "...", "site": "...",
   "window": {"from": "...", "to": "..."},
-  "summary": {"monitors_alerting": 2, "incidents_open": 0, "error_logs": 5, ...},
+  "summary": {"monitors_alerting": 2, "incidents_open": 0, "error_logs": 5,
+              "audit_changes": 1, "hosts_up": 11, "hosts_total": 12, ...},
   "errors": {"pipelines": "CI Visibility not enabled ..."},
   "monitors_alerting": [...], "incidents_open": [...], "slos_at_risk": [...],
-  "events": [...], "error_logs": [...], "security_signals": {...},
-  "pipelines": [...], "downtimes_active": [...]
+  "events": [...], "error_logs": [...], "audit_changes": [...],
+  "security_signals": {...}, "pipelines": [...], "downtimes_active": [...],
+  "host_totals": {"total_up": 11, "total_active": 12}
 }
 ```
 
 Read `summary` first to decide where to drill down. `errors` lists sections
 that failed (missing permissions, product not enabled) — the rest of the
 snapshot is still valid. Check `downtimes_active` before concluding an alert
-is being ignored: it may be muted on purpose.
+is being ignored: it may be muted on purpose. `audit_changes` tells you who
+changed configuration in the window — an alert right after a monitor edit or
+a deleted downtime usually isn't a coincidence. Alerting monitors come
+enriched with their `query` and `message` (top 10). Compare `hosts_up` vs
+`hosts_total` to spot machines that dropped off.
+
+### Investigate one service
+
+When the question is about a specific service, `services context` returns
+the full dossier in one call:
+
+```sh
+datadog services context api --since 2h --json
+```
+
+It includes: Service Catalog entry (team/tier/links), all monitors tagged
+with the service, SLOs, **log volume by status** (`{"error": 664, "info":
+12379, "warn": 833}` — is the error rate abnormal?), recent error logs,
+error spans from APM (failing endpoints with durations and trace IDs),
+events and active downtimes. Same `summary`/`errors` conventions as triage.
 
 ### Drill down
 
 ```sh
 datadog logs "service:api status:error" --since 2h --json   # includes tags + attributes
+datadog logs "service:api" --all --jsonl                    # paginate everything (cap 5000), NDJSON
+datadog audit --since 24h --json                            # who changed what (config changes)
 datadog monitors show <id> --json
 datadog incidents show <id> --json
 datadog correlate --around <spike-ts> --window 10m --json   # events/incidents/security near a timestamp
+datadog metrics meta system.cpu.user --json                 # unit/type before interpreting numbers
 datadog metrics query "avg:system.cpu.user{service:api}" --json
 datadog logs-aggregate "service:api" --group-by status --json
 ```
+
+Audit query tips: `-@asset.type:datadog_agent_configuration` drops periodic
+agent-config noise; `@evt.name:Monitor` narrows to monitor changes;
+`@usr.email:x@y.com` narrows to one author.
 
 ### Conventions you can rely on
 

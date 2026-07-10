@@ -52,10 +52,14 @@ Two commands are designed specifically for automation:
   (commands, flags, types, defaults, which support `--json`) as JSON.
   One call to discover everything the CLI can do.
 - **`datadog triage [--since 1h] [--service X] [--env Y] --json`** — one-shot
-  context snapshot: alerting monitors, open incidents, SLOs at risk, events,
-  error logs, security signals, CI pipelines and active downtimes, fetched
-  concurrently and returned as a single JSON document with a `summary` block
-  and per-section `errors`.
+  context snapshot: alerting monitors (enriched with query + message), open
+  incidents, SLOs at risk, events, error logs, audit-trail config changes,
+  security signals, CI pipelines, active downtimes and host up/total counts,
+  fetched concurrently and returned as a single JSON document with a
+  `summary` block and per-section `errors`.
+- **`datadog services context <name> [--since 1h] --json`** — the one-call
+  dossier for a single service: catalog entry, monitors, SLOs, log volume by
+  status, error logs, APM error spans, events and downtimes.
 
 See [AGENTS.md](AGENTS.md) for the full agent guide and recipes.
 
@@ -65,15 +69,15 @@ See [AGENTS.md](AGENTS.md) for the full agent guide and recipes.
 |-------------|-----------------------------------------------------------------|
 | Snapshot    | `triage`, `status`, `last`, `correlate`, `watch`                |
 | Monitors    | `monitors [show/mute/unmute/search/create/update/delete]`, `batch mute/unmute` |
-| Logs        | `logs`, `logs tail`, `logs-aggregate`                           |
-| Metrics     | `metrics search/query`, `tags`                                  |
+| Logs        | `logs` (`--all`, `--jsonl`), `logs tail`, `logs-aggregate`      |
+| Metrics     | `metrics search/query/meta`, `tags`                             |
 | Dashboards  | `dashboards [show/open/create/update/delete/lint]`              |
 | Incidents   | `incidents [show/create/update]`                                |
 | SLOs        | `slos [show]`                                                   |
 | Traces/RUM  | `traces`, `rum`, `profile`                                      |
-| Infra       | `hosts [mute/unmute]`, `services`, `integrations`               |
+| Infra       | `hosts [mute/unmute]`, `services [show/context]`, `integrations` |
 | CI/CD       | `pipelines`, `deploy`, `synthetics`                             |
-| Security    | `security`                                                      |
+| Security    | `security`, `audit`                                             |
 | Other       | `events`, `downtimes`, `notebooks`, `usage`, `open`, `ui` (TUI) |
 | Meta        | `schema`, `whoami`, `login`, `logout`, `config`, `profile`, `completion` |
 
