@@ -1,0 +1,12 @@
+# Compiled binary
+/datadog-cli
+/dist/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Test artifacts
+*.test
+coverage.out
