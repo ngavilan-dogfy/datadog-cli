@@ -18,6 +18,7 @@ var (
 	logsPlain    bool
 	logsLimit    int
 	logsMinutes  int
+	logsSince    string
 	logsFrom     string
 	logsTo       string
 	tailInterval int
@@ -39,8 +40,8 @@ Output adapts automatically:
 Examples:
   datadog logs "service:api"                       # search logs
   datadog logs "service:api status:error"          # errors only
-  datadog logs "service:api" --minutes 60          # last hour
-  datadog logs "@http.status_code:500" --json      # JSON output
+  datadog logs "service:api" --since 2h            # last 2 hours
+  datadog logs "@http.status_code:500" --json      # JSON output (includes tags + attributes)
   datadog logs "env:prod" --limit 100              # more results
   datadog logs "*" --from "2024-01-01T00:00:00Z"   # custom range`,
 	Args: cobra.ExactArgs(1),
@@ -50,7 +51,16 @@ Examples:
 		from := logsFrom
 		to := logsTo
 		if from == "" {
-			from = time.Now().Add(-time.Duration(logsMinutes) * time.Minute).Format(time.RFC3339)
+			lookback := time.Duration(logsMinutes) * time.Minute
+			if logsSince != "" {
+				d, err := parseDuration(logsSince)
+				if err != nil {
+					return fmt.Errorf("--since: %w", err)
+				}
+				lookback = d
+				logsMinutes = int(d.Minutes())
+			}
+			from = time.Now().Add(-lookback).Format(time.RFC3339)
 		}
 		if to == "" {
 			to = time.Now().Format(time.RFC3339)
@@ -83,24 +93,28 @@ Examples:
 // --- helpers ---
 
 type logJSONOut struct {
-	ID        string `json:"id"`
-	Timestamp string `json:"timestamp"`
-	Status    string `json:"status"`
-	Host      string `json:"host"`
-	Service   string `json:"service"`
-	Message   string `json:"message"`
+	ID         string                 `json:"id"`
+	Timestamp  string                 `json:"timestamp"`
+	Status     string                 `json:"status"`
+	Host       string                 `json:"host"`
+	Service    string                 `json:"service"`
+	Message    string                 `json:"message"`
+	Tags       []string               `json:"tags,omitempty"`
+	Attributes map[string]interface{} `json:"attributes,omitempty"`
 }
 
 func logsToJSON(logs []datadog.LogData) []logJSONOut {
 	out := make([]logJSONOut, len(logs))
 	for i, l := range logs {
 		out[i] = logJSONOut{
-			ID:        l.ID,
-			Timestamp: l.Attributes.Timestamp,
-			Status:    l.Attributes.Status,
-			Host:      l.Attributes.Host,
-			Service:   l.Attributes.Service,
-			Message:   l.Attributes.Message,
+			ID:         l.ID,
+			Timestamp:  l.Attributes.Timestamp,
+			Status:     l.Attributes.Status,
+			Host:       l.Attributes.Host,
+			Service:    l.Attributes.Service,
+			Message:    l.Attributes.Message,
+			Tags:       l.Attributes.Tags,
+			Attributes: l.Attributes.Attributes,
 		}
 	}
 	return out
@@ -217,6 +231,7 @@ func init() {
 	logsCmd.Flags().BoolVar(&logsPlain, "plain", false, "Force plain TSV output")
 	logsCmd.Flags().IntVarP(&logsLimit, "limit", "n", 25, "Maximum number of results")
 	logsCmd.Flags().IntVar(&logsMinutes, "minutes", 15, "Minutes of history to search (default 15)")
+	logsCmd.Flags().StringVar(&logsSince, "since", "", "Lookback window as duration (30m, 2h, 1d) — overrides --minutes")
 	logsCmd.Flags().StringVar(&logsFrom, "from", "", "Start time (RFC3339)")
 	logsCmd.Flags().StringVar(&logsTo, "to", "", "End time (RFC3339)")
 
