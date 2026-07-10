@@ -146,7 +146,8 @@ type LogsFilter struct {
 }
 
 type LogsPage struct {
-	Limit int `json:"limit,omitempty"`
+	Limit  int    `json:"limit,omitempty"`
+	Cursor string `json:"cursor,omitempty"`
 }
 
 type LogsResponse struct {

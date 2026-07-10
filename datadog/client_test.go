@@ -11,8 +11,51 @@ func TestAPIErrorMessage(t *testing.T) {
 	if got := apiErrorMessage([]byte(`{"errors":["bad query","try again"]}`)); got != "bad query; try again" {
 		t.Errorf("got %q", got)
 	}
+	// v2 object shape: {title, detail}
+	if got := apiErrorMessage([]byte(`{"errors":[{"title":"Generic Error","detail":"service [api] not found"}]}`)); got != "service [api] not found" {
+		t.Errorf("v2 shape: got %q", got)
+	}
+	if got := apiErrorMessage([]byte(`{"errors":[{"title":"Forbidden"}]}`)); got != "Forbidden" {
+		t.Errorf("title-only: got %q", got)
+	}
 	if got := apiErrorMessage([]byte(`plain text error`)); got != "plain text error" {
 		t.Errorf("fallback: got %q", got)
+	}
+}
+
+func TestAuditEventAttrs(t *testing.T) {
+	a := AuditEventAttrs{Attributes: map[string]interface{}{
+		"action": "modified",
+		"asset":  map[string]interface{}{"type": "monitor", "name": "CPU high"},
+		"evt": map[string]interface{}{
+			"name":  "Monitor",
+			"actor": map[string]interface{}{"type": "USER"},
+		},
+		"usr": map[string]interface{}{"email": "ana@example.com"},
+	}}
+	if got := a.Product(); got != "Monitor" {
+		t.Errorf("Product: %q", got)
+	}
+	if got := a.Action(); got != "modified" {
+		t.Errorf("Action: %q", got)
+	}
+	if got := a.Actor(); got != "ana@example.com" {
+		t.Errorf("Actor: %q", got)
+	}
+	if got := a.ResourceName(); got != "CPU high" {
+		t.Errorf("ResourceName: %q", got)
+	}
+
+	// SYSTEM event without usr falls back to actor type
+	sys := AuditEventAttrs{Attributes: map[string]interface{}{
+		"evt": map[string]interface{}{
+			"name":  "Datadog Agent",
+			"actor": map[string]interface{}{"type": "SYSTEM"},
+		},
+		"usr": map[string]interface{}{},
+	}}
+	if got := sys.Actor(); got != "SYSTEM" {
+		t.Errorf("system Actor: %q", got)
 	}
 }
 

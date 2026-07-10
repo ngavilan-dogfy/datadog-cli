@@ -127,13 +127,35 @@ func retryAfter(resp *http.Response, attempt int) time.Duration {
 }
 
 // apiErrorMessage extracts Datadog's {"errors": [...]} body into a readable
-// message, falling back to the truncated raw body.
+// message. Handles both shapes the API uses — plain strings (v1) and
+// {title, detail} objects (v2) — falling back to the truncated raw body.
 func apiErrorMessage(body []byte) string {
 	var e struct {
-		Errors []string `json:"errors"`
+		Errors []json.RawMessage `json:"errors"`
 	}
 	if err := json.Unmarshal(body, &e); err == nil && len(e.Errors) > 0 {
-		return strings.Join(e.Errors, "; ")
+		var msgs []string
+		for _, raw := range e.Errors {
+			var s string
+			if json.Unmarshal(raw, &s) == nil && s != "" {
+				msgs = append(msgs, s)
+				continue
+			}
+			var obj struct {
+				Title  string `json:"title"`
+				Detail string `json:"detail"`
+			}
+			if json.Unmarshal(raw, &obj) == nil {
+				if obj.Detail != "" {
+					msgs = append(msgs, obj.Detail)
+				} else if obj.Title != "" {
+					msgs = append(msgs, obj.Title)
+				}
+			}
+		}
+		if len(msgs) > 0 {
+			return strings.Join(msgs, "; ")
+		}
 	}
 	return truncate(string(body), 2000)
 }
@@ -297,27 +319,7 @@ func (c *Client) PostEvent(req PostEventRequest) (*Event, error) {
 // --- Logs ---
 
 func (c *Client) SearchLogs(query string, from, to string, limit int) (*LogsResponse, error) {
-	if limit == 0 {
-		limit = 25
-	}
-
-	req := LogsSearchRequest{
-		Filter: LogsFilter{
-			Query: query,
-			From:  from,
-			To:    to,
-		},
-		Sort: "-timestamp",
-		Page: LogsPage{Limit: limit},
-	}
-
-	data, err := c.do("POST", "/api/v2/logs/events/search", req)
-	if err != nil {
-		return nil, err
-	}
-
-	var result LogsResponse
-	return &result, json.Unmarshal(data, &result)
+	return c.SearchLogsCursor(query, from, to, limit, "")
 }
 
 // --- Downtimes (v2) ---
