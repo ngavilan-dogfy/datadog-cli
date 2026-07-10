@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	"datadog-cli/datadog"
 )
 
 func TestParseDateEpochSeconds(t *testing.T) {
@@ -109,6 +111,19 @@ func TestBuildSchema(t *testing.T) {
 	}
 	if len(data) == 0 {
 		t.Error("empty schema")
+	}
+}
+
+func TestBucketCount(t *testing.T) {
+	b := datadog.LogsAggregateBucket{
+		By:       map[string]string{"status": "error"},
+		Computes: map[string]interface{}{"c0": float64(664)},
+	}
+	if got := bucketCount(b); got != 664 {
+		t.Errorf("got %d", got)
+	}
+	if got := bucketCount(datadog.LogsAggregateBucket{}); got != 0 {
+		t.Errorf("empty bucket: got %d", got)
 	}
 }
 
