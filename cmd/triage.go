@@ -41,14 +41,24 @@ type triageSnapshot struct {
 	Summary     map[string]int    `json:"summary"`
 	Errors      map[string]string `json:"errors,omitempty"`
 
-	MonitorsAlerting []datadog.MonitorSearchHit `json:"monitors_alerting"`
-	IncidentsOpen    []datadog.IncidentData     `json:"incidents_open"`
-	SLOsAtRisk       []datadog.SLO              `json:"slos_at_risk"`
-	Events           []eventJSONOut             `json:"events"`
-	ErrorLogs        []logJSONOut               `json:"error_logs"`
-	SecuritySignals  interface{}                `json:"security_signals,omitempty"`
-	Pipelines        []datadog.CIPipelineEvent  `json:"pipelines"`
-	DowntimesActive  []datadog.DowntimeData     `json:"downtimes_active"`
+	MonitorsAlerting []triageMonitor           `json:"monitors_alerting"`
+	IncidentsOpen    []datadog.IncidentData    `json:"incidents_open"`
+	SLOsAtRisk       []datadog.SLO             `json:"slos_at_risk"`
+	Events           []eventJSONOut            `json:"events"`
+	ErrorLogs        []logJSONOut              `json:"error_logs"`
+	AuditChanges     []auditJSONOut            `json:"audit_changes"`
+	SecuritySignals  interface{}               `json:"security_signals,omitempty"`
+	Pipelines        []datadog.CIPipelineEvent `json:"pipelines"`
+	DowntimesActive  []datadog.DowntimeData    `json:"downtimes_active"`
+	HostTotals       *datadog.HostTotals       `json:"host_totals,omitempty"`
+}
+
+// triageMonitor is a search hit enriched with the monitor's query and
+// notification message — the two fields an investigator needs first.
+type triageMonitor struct {
+	datadog.MonitorSearchHit
+	Query   string `json:"query,omitempty"`
+	Message string `json:"message,omitempty"`
 }
 
 type triageWindowOut struct {
@@ -61,14 +71,16 @@ var triageCmd = &cobra.Command{
 	Short: "One-shot context snapshot: every signal in a window, in one call",
 	Long: `Gather everything relevant to "what is going on right now" in one call:
 
-  • Monitors currently in Alert/Warn
+  • Monitors currently in Alert/Warn — enriched with query + message (top 10)
   • Open incidents (plus which started inside the window)
   • SLOs in WARNING or BREACHED
   • Events in the window
   • Error logs in the window (status:error, optionally scoped by service/env)
+  • Audit trail: config changes in the window (who edited what)
   • Security signals in the window
   • CI pipeline runs in the window (deploy correlation)
   • Active downtimes (what is muted and why)
+  • Host totals (up vs total)
 
 All sections are fetched concurrently. With --json the result is a single
 structured snapshot with a summary block — designed so an AI agent or script
@@ -128,7 +140,7 @@ Examples:
 		fromStr := from.Format(time.RFC3339)
 		toStr := to.Format(time.RFC3339)
 
-		// Monitors in Alert/Warn
+		// Monitors in Alert/Warn, enriched with query + message (capped)
 		run(func() {
 			q := "status:(Alert OR Warn)"
 			if triageService != "" {
@@ -139,7 +151,24 @@ Examples:
 				fail("monitors", err)
 				return
 			}
-			snap.MonitorsAlerting = res.Monitors
+			enriched := make([]triageMonitor, len(res.Monitors))
+			var mwg sync.WaitGroup
+			for i, hit := range res.Monitors {
+				enriched[i] = triageMonitor{MonitorSearchHit: hit}
+				if i >= 10 {
+					continue
+				}
+				mwg.Add(1)
+				go func(i int, id int64) {
+					defer mwg.Done()
+					if m, err := client.GetMonitor(id); err == nil {
+						enriched[i].Query = m.Query
+						enriched[i].Message = m.Message
+					}
+				}(i, hit.ID)
+			}
+			mwg.Wait()
+			snap.MonitorsAlerting = enriched
 		})
 
 		// Open incidents
@@ -232,6 +261,27 @@ Examples:
 			snap.Pipelines = res
 		})
 
+		// Audit trail: config changes in the window (agent-config noise excluded)
+		run(func() {
+			events, err := client.SearchAuditEvents(
+				"-@asset.type:datadog_agent_configuration", fromStr, toStr, 25)
+			if err != nil {
+				fail("audit_changes", err)
+				return
+			}
+			snap.AuditChanges = auditToJSON(events)
+		})
+
+		// Host totals (are machines down?)
+		run(func() {
+			totals, err := client.GetHostTotals()
+			if err != nil {
+				fail("host_totals", err)
+				return
+			}
+			snap.HostTotals = totals
+		})
+
 		// Active downtimes
 		run(func() {
 			dts, err := client.ListDowntimes()
@@ -258,9 +308,14 @@ Examples:
 			"slos_at_risk":      len(snap.SLOsAtRisk),
 			"events":            len(snap.Events),
 			"error_logs":        len(snap.ErrorLogs),
+			"audit_changes":     len(snap.AuditChanges),
 			"security_signals":  secCount,
 			"pipelines":         len(snap.Pipelines),
 			"downtimes_active":  len(snap.DowntimesActive),
+		}
+		if snap.HostTotals != nil {
+			snap.Summary["hosts_up"] = snap.HostTotals.TotalUp
+			snap.Summary["hosts_total"] = snap.HostTotals.TotalActive
 		}
 		if len(snap.Errors) == 0 {
 			snap.Errors = nil
@@ -363,8 +418,27 @@ func printTriageTTY(snap triageSnapshot) {
 		}
 	}
 
-	fmt.Println(ui.SectionHeader.Render(fmt.Sprintf("  Security signals (%d) · Pipelines (%d) · Active downtimes (%d)",
-		snap.Summary["security_signals"], len(snap.Pipelines), len(snap.DowntimesActive))))
+	if section("Config changes (audit)", len(snap.AuditChanges), "(none)") {
+		for _, a := range snap.AuditChanges {
+			actor := a.Actor
+			if actor == "" {
+				actor = "—"
+			}
+			line := fmt.Sprintf("  %s  %s %s  %s",
+				ui.Dimmed.Render(a.Timestamp), ui.SuccessStyle.Render(a.Product), a.Action, actor)
+			if a.Resource != "" {
+				line += ui.Dimmed.Render("  → " + a.Resource)
+			}
+			fmt.Println(line)
+		}
+	}
+
+	tail := fmt.Sprintf("  Security signals (%d) · Pipelines (%d) · Active downtimes (%d)",
+		snap.Summary["security_signals"], len(snap.Pipelines), len(snap.DowntimesActive))
+	if snap.HostTotals != nil {
+		tail += fmt.Sprintf(" · Hosts up %d/%d", snap.HostTotals.TotalUp, snap.HostTotals.TotalActive)
+	}
+	fmt.Println(ui.SectionHeader.Render(tail))
 
 	if len(snap.Errors) > 0 {
 		fmt.Println(ui.SectionHeader.Render("  Sections with errors"))
