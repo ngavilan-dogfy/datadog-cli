@@ -43,7 +43,7 @@ Examples:
 		}
 
 		// Build monitor search query
-		monQuery := "status:(Alert,Warn)"
+		monQuery := "status:(Alert OR Warn)"
 		if statusTeam != "" {
 			monQuery += " tag:\"team:" + statusTeam + "\""
 		}

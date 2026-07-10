@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -130,22 +131,23 @@ func resolveCorrelateWindow() (time.Time, time.Time, error) {
 
 func parseDate(s string) (time.Time, error) {
 	s = strings.TrimSpace(s)
-	// Try epoch seconds (10 digits) or millis (13 digits)
-	if len(s) == 10 {
-		if v, err := time.Parse("2006-01-02", s); err == nil {
-			return v, nil
+	// Pure number → epoch seconds or millis
+	if v, err := strconv.ParseInt(s, 10, 64); err == nil {
+		if len(s) >= 13 {
+			return time.UnixMilli(v), nil
 		}
+		return time.Unix(v, 0), nil
 	}
-	for _, layout := range []string{time.RFC3339, time.RFC3339Nano, "2006-01-02T15:04:05Z", "2006-01-02 15:04:05"} {
+	for _, layout := range []string{
+		time.RFC3339, time.RFC3339Nano,
+		"2006-01-02T15:04:05Z", "2006-01-02 15:04:05",
+		"2006-01-02T15:04", "2006-01-02",
+	} {
 		if v, err := time.Parse(layout, s); err == nil {
 			return v, nil
 		}
 	}
-	// Pure number → epoch (seconds or millis)
-	if v, err := time.Parse("2006-01-02T15:04", s); err == nil {
-		return v, nil
-	}
-	return time.Time{}, fmt.Errorf("unrecognized timestamp %q (try RFC3339)", s)
+	return time.Time{}, fmt.Errorf("unrecognized timestamp %q (try RFC3339 or epoch seconds/millis)", s)
 }
 
 func printCorrelateTTY(from, to time.Time, events []datadog.Event, incs []datadog.IncidentData, sec *datadog.SecuritySignalsResponse, pi []datadog.CIPipelineEvent) {

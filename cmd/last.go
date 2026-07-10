@@ -41,7 +41,7 @@ Examples:
 		start := end.Add(-time.Duration(lastMinutes) * time.Minute)
 
 		// 1) Triggered monitors — use the rich search endpoint
-		monRes, _ := client.SearchMonitorsRich("status:(Alert,Warn,\"No Data\")", 100)
+		monRes, _ := client.SearchMonitorsRich("status:(Alert OR Warn OR \"No Data\")", 100)
 
 		// 2) Events in the window — pick the noteworthy ones (alert/error/success deploys)
 		events, _ := client.ListEvents(start.Unix(), end.Unix(), "")

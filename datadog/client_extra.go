@@ -185,6 +185,10 @@ func (c *Client) SearchPipelines(query string, from, to string, limit int) ([]CI
 	if limit == 0 {
 		limit = 25
 	}
+	if query == "" {
+		// Empty query makes the API compose an invalid "... AND ()" filter.
+		query = "*"
+	}
 
 	body := map[string]interface{}{
 		"filter": map[string]interface{}{
@@ -201,7 +205,8 @@ func (c *Client) SearchPipelines(query string, from, to string, limit int) ([]CI
 	data, err := c.do("POST", "/api/v2/ci/pipelines/events/search", body)
 	if err != nil {
 		// CI Visibility might not be enabled
-		if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") {
+		if strings.Contains(err.Error(), "403") || strings.Contains(err.Error(), "404") ||
+			strings.Contains(err.Error(), "No valid indexes") {
 			return nil, fmt.Errorf("CI Visibility not enabled or insufficient permissions")
 		}
 		return nil, err

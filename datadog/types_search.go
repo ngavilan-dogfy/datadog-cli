@@ -204,10 +204,11 @@ type MonitorSearchCount struct {
 	} `json:"status"`
 }
 
+// Matches the real /api/v1/monitor/search response, where page fields are
+// flat numbers on metadata (not a nested page object).
 type MonitorSearchMeta struct {
-	Page MonitorSearchMetaPage `json:"page"`
-}
-
-type MonitorSearchMetaPage struct {
-	TotalFilteredCount int `json:"total_filtered_count"`
+	Page       int `json:"page"`
+	PageCount  int `json:"page_count"`
+	PerPage    int `json:"per_page"`
+	TotalCount int `json:"total_count"`
 }
