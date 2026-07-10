@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -85,7 +86,7 @@ Environment variables DD_API_KEY, DD_APP_KEY, DD_SITE override profile settings.
 		noAuth := []string{
 			"datadog login", "datadog logout", "datadog setup",
 			"datadog profile", "datadog config",
-			"datadog help", "datadog completion",
+			"datadog help", "datadog completion", "datadog schema",
 		}
 		needsAuth := true
 		for _, prefix := range noAuth {
@@ -109,7 +110,24 @@ Environment variables DD_API_KEY, DD_APP_KEY, DD_SITE override profile settings.
 }
 
 func Execute() {
+	datadog.UserAgent = "datadog-cli/" + Version
 	if err := rootCmd.Execute(); err != nil {
+		if wantsJSON() {
+			// One parseable line on stderr for scripts/agents running with --json.
+			if enc, jerr := json.Marshal(map[string]string{"error": err.Error()}); jerr == nil {
+				fmt.Fprintln(os.Stderr, string(enc))
+			}
+		}
 		os.Exit(1)
 	}
+}
+
+// wantsJSON reports whether --json appeared anywhere on the command line.
+func wantsJSON() bool {
+	for _, a := range os.Args[1:] {
+		if a == "--json" {
+			return true
+		}
+	}
+	return false
 }

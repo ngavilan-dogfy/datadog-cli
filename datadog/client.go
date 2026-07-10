@@ -12,6 +12,9 @@ import (
 	"time"
 )
 
+// UserAgent is sent on every request; cmd overwrites it with the build version.
+var UserAgent = "datadog-cli"
+
 type Client struct {
 	apiURL     string
 	appURL     string
@@ -37,48 +40,102 @@ func (c *Client) BrowseURL(path string) string {
 	return c.appURL + path
 }
 
+const maxRetries = 3
+
 func (c *Client) do(method, path string, body interface{}) ([]byte, error) {
-	var bodyReader io.Reader
+	var bodyData []byte
 	if body != nil {
 		data, err := json.Marshal(body)
 		if err != nil {
 			return nil, err
 		}
-		bodyReader = bytes.NewReader(data)
+		bodyData = data
 	}
 
-	req, err := http.NewRequest(method, c.apiURL+path, bodyReader)
-	if err != nil {
-		return nil, err
+	var lastErr error
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		var bodyReader io.Reader
+		if bodyData != nil {
+			bodyReader = bytes.NewReader(bodyData)
+		}
+
+		req, err := http.NewRequest(method, c.apiURL+path, bodyReader)
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("DD-API-KEY", c.apiKey)
+		req.Header.Set("DD-APPLICATION-KEY", c.appKey)
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept", "application/json")
+		req.Header.Set("User-Agent", UserAgent)
+
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			time.Sleep(backoff(attempt))
+			continue
+		}
+
+		respBody, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			lastErr = err
+			time.Sleep(backoff(attempt))
+			continue
+		}
+
+		switch {
+		case resp.StatusCode == 429:
+			lastErr = fmt.Errorf("rate limited (429): %s", apiErrorMessage(respBody))
+			time.Sleep(retryAfter(resp, attempt))
+			continue
+		case resp.StatusCode >= 500:
+			lastErr = fmt.Errorf("API error %d: %s", resp.StatusCode, apiErrorMessage(respBody))
+			time.Sleep(backoff(attempt))
+			continue
+		case resp.StatusCode == 403:
+			return nil, fmt.Errorf("forbidden — check your API/App keys (run 'datadog login')")
+		case resp.StatusCode == 401:
+			return nil, fmt.Errorf("unauthorized — run 'datadog login' to set credentials")
+		case resp.StatusCode >= 400:
+			return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, apiErrorMessage(respBody))
+		}
+
+		return respBody, nil
 	}
 
-	req.Header.Set("DD-API-KEY", c.apiKey)
-	req.Header.Set("DD-APPLICATION-KEY", c.appKey)
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
+	return nil, fmt.Errorf("giving up after %d retries: %w", maxRetries, lastErr)
+}
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
+func backoff(attempt int) time.Duration {
+	return time.Duration(attempt+1) * 500 * time.Millisecond
+}
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
+// retryAfter honors the Retry-After header on 429s, capped at 30s.
+func retryAfter(resp *http.Response, attempt int) time.Duration {
+	if v := resp.Header.Get("Retry-After"); v != "" {
+		if secs, err := strconv.Atoi(v); err == nil && secs > 0 {
+			d := time.Duration(secs) * time.Second
+			if d > 30*time.Second {
+				d = 30 * time.Second
+			}
+			return d
+		}
 	}
+	return backoff(attempt)
+}
 
-	if resp.StatusCode == 403 {
-		return nil, fmt.Errorf("forbidden — check your API/App keys (run 'datadog login')")
+// apiErrorMessage extracts Datadog's {"errors": [...]} body into a readable
+// message, falling back to the truncated raw body.
+func apiErrorMessage(body []byte) string {
+	var e struct {
+		Errors []string `json:"errors"`
 	}
-	if resp.StatusCode == 401 {
-		return nil, fmt.Errorf("unauthorized — run 'datadog login' to set credentials")
+	if err := json.Unmarshal(body, &e); err == nil && len(e.Errors) > 0 {
+		return strings.Join(e.Errors, "; ")
 	}
-	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, truncate(string(respBody), 2000))
-	}
-
-	return respBody, nil
+	return truncate(string(body), 2000)
 }
 
 func truncate(s string, max int) string {
