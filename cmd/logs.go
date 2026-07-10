@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
@@ -15,7 +17,9 @@ import (
 
 var (
 	logsJSON     bool
+	logsJSONL    bool
 	logsPlain    bool
+	logsAll      bool
 	logsLimit    int
 	logsMinutes  int
 	logsSince    string
@@ -24,6 +28,9 @@ var (
 	tailInterval int
 	tailJSON     bool
 )
+
+// logsAllCap bounds --all pagination so a broad query can't run forever.
+const logsAllCap = 5000
 
 var logsCmd = &cobra.Command{
 	Use:   "logs <query>",
@@ -66,16 +73,46 @@ Examples:
 			to = time.Now().Format(time.RFC3339)
 		}
 
-		result, err := client.SearchLogs(query, from, to, logsLimit)
-		if err != nil {
-			return err
+		var logs []datadog.LogData
+		if logsAll {
+			cursor := ""
+			for {
+				res, err := client.SearchLogsCursor(query, from, to, 200, cursor)
+				if err != nil {
+					return err
+				}
+				logs = append(logs, res.Data...)
+				cursor = res.Meta.Page.After
+				if cursor == "" || len(logs) >= logsAllCap {
+					break
+				}
+			}
+			if len(logs) >= logsAllCap {
+				fmt.Fprintf(os.Stderr, "note: output capped at %d logs — narrow the query or window for the rest\n", logsAllCap)
+			}
+		} else {
+			result, err := client.SearchLogs(query, from, to, logsLimit)
+			if err != nil {
+				return err
+			}
+			logs = result.Data
+		}
+
+		if logsJSONL {
+			enc := json.NewEncoder(os.Stdout)
+			for _, l := range logsToJSON(logs) {
+				if err := enc.Encode(l); err != nil {
+					return err
+				}
+			}
+			return nil
 		}
 
 		if logsJSON {
-			return printJSON(logsToJSON(result.Data))
+			return printJSON(logsToJSON(logs))
 		}
 
-		if len(result.Data) == 0 {
+		if len(logs) == 0 {
 			if isTTY() && !logsPlain {
 				fmt.Println(ui.Dimmed.Render("  No logs found."))
 			}
@@ -83,10 +120,10 @@ Examples:
 		}
 
 		if !isTTY() || logsPlain {
-			return printLogsTSV(result.Data)
+			return printLogsTSV(logs)
 		}
 
-		return printLogsTable(result.Data, query)
+		return printLogsTable(logs, query)
 	},
 }
 
@@ -228,6 +265,8 @@ Examples:
 
 func init() {
 	logsCmd.Flags().BoolVar(&logsJSON, "json", false, "Output as JSON array")
+	logsCmd.Flags().BoolVar(&logsJSONL, "jsonl", false, "Output as JSON lines (one object per line, streaming-friendly)")
+	logsCmd.Flags().BoolVar(&logsAll, "all", false, fmt.Sprintf("Paginate through all results (capped at %d)", logsAllCap))
 	logsCmd.Flags().BoolVar(&logsPlain, "plain", false, "Force plain TSV output")
 	logsCmd.Flags().IntVarP(&logsLimit, "limit", "n", 25, "Maximum number of results")
 	logsCmd.Flags().IntVar(&logsMinutes, "minutes", 15, "Minutes of history to search (default 15)")
