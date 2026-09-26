@@ -32,8 +32,61 @@ var KnownSites = []struct {
 	{"datadoghq.eu", "EU1"},
 	{"us3.datadoghq.com", "US3"},
 	{"us5.datadoghq.com", "US5"},
-	{"ap1.datadoghq.com", "AP1"},
-	{"ddog-gov.com", "US1-FED / GovCloud"},
+	{"ap1.datadoghq.com", "AP1 (Japan)"},
+	{"ap2.datadoghq.com", "AP2 (Australia)"},
+	{"ddog-gov.com", "US1-FED (GovCloud)"},
+}
+
+// ParseSite understands a site name ("datadoghq.eu", "eu", "us5"), an app
+// host ("app.datadoghq.eu", "us5.datadoghq.com", "acme.datadoghq.eu") or any
+// Datadog URL pasted from the browser, and returns the site it belongs to.
+func ParseSite(input string) (string, bool) {
+	in := strings.ToLower(strings.TrimSpace(input))
+	if in == "" {
+		return "", false
+	}
+	switch in { // short names
+	case "us", "us1", "com":
+		return "datadoghq.com", true
+	case "eu", "eu1":
+		return "datadoghq.eu", true
+	case "us3", "us5", "ap1", "ap2":
+		return in + ".datadoghq.com", true
+	case "gov", "fed", "us1-fed":
+		return "ddog-gov.com", true
+	}
+	host := in
+	if i := strings.Index(host, "://"); i >= 0 {
+		host = host[i+3:]
+	}
+	if i := strings.IndexAny(host, "/?#:"); i >= 0 {
+		host = host[:i]
+	}
+	for _, s := range KnownSites {
+		if host == s.Site || strings.HasSuffix(host, "."+s.Site) {
+			// app.datadoghq.eu, api.us5.datadoghq.com, acme.datadoghq.eu (custom
+			// subdomain) — but us5.datadoghq.com must not become datadoghq.com.
+			if s.Site == "datadoghq.com" {
+				for _, r := range []string{"us3", "us5", "ap1", "ap2"} {
+					if host == r+".datadoghq.com" || strings.HasSuffix(host, "."+r+".datadoghq.com") {
+						return r + ".datadoghq.com", true
+					}
+				}
+			}
+			return s.Site, true
+		}
+	}
+	return "", false
+}
+
+// SiteLabel is the region name of a site ("EU1").
+func SiteLabel(site string) string {
+	for _, s := range KnownSites {
+		if s.Site == site {
+			return strings.TrimSuffix(s.Label, " (default)")
+		}
+	}
+	return site
 }
 
 func (p *Profile) APIURL() string {
@@ -49,7 +102,7 @@ func (p *Profile) AppURL() string {
 	if site == "" {
 		site = "datadoghq.com"
 	}
-	// Sites with subdomains of datadoghq.com (us3, us5, ap1) don't use "app." prefix
+	// Sites with subdomains of datadoghq.com (us3, us5, ap1, ap2) don't use "app." prefix
 	switch site {
 	case "datadoghq.com", "datadoghq.eu", "ddog-gov.com":
 		return fmt.Sprintf("https://app.%s", site)
@@ -124,6 +177,11 @@ func LoadActive() (*Profile, error) {
 	name := ActiveName()
 	p, err := Load(name)
 	if err != nil {
+		// No profile on disk: environment variables alone are enough (CI,
+		// containers, agents): DD_API_KEY + DD_APP_KEY [+ DD_SITE].
+		if envP := envProfile(); envP != nil {
+			return envP, nil
+		}
 		return nil, err
 	}
 
@@ -140,13 +198,63 @@ func LoadActive() (*Profile, error) {
 	return p, nil
 }
 
+// envProfile builds a profile purely from DD_API_KEY, DD_APP_KEY and
+// DD_SITE, or returns nil when the keys are missing.
+func envProfile() *Profile {
+	api, app := os.Getenv("DD_API_KEY"), os.Getenv("DD_APP_KEY")
+	if api == "" || app == "" {
+		return nil
+	}
+	site := "datadoghq.com"
+	if v := os.Getenv("DD_SITE"); v != "" {
+		if s, ok := ParseSite(v); ok {
+			site = s
+		} else {
+			site = v
+		}
+	}
+	return &Profile{Name: "env", APIKey: api, AppKey: app, Site: site, MaxResults: 25}
+}
+
+// Save writes the profile atomically (temp file + rename), readable only by
+// the user: a reader must never see a half-written file.
 func Save(p *Profile) error {
-	os.MkdirAll(ProfileDir(), 0700)
+	if err := os.MkdirAll(ProfileDir(), 0700); err != nil {
+		return err
+	}
 	data, err := yaml.Marshal(p)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(profilePath(p.Name), data, 0600)
+	tmp, err := os.CreateTemp(ProfileDir(), "."+p.Name+"-*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(tmp.Name())
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Chmod(0600); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	return os.Rename(tmp.Name(), profilePath(p.Name))
+}
+
+// Mask hides a key but its last 4 characters — how Datadog lists keys in
+// Organization Settings, so it can be recognised there.
+func Mask(key string) string {
+	if key == "" {
+		return ""
+	}
+	if len(key) <= 8 {
+		return "****"
+	}
+	return "****" + key[len(key)-4:]
 }
 
 func Create(name string) (*Profile, error) {
@@ -201,15 +309,9 @@ func (p *Profile) Get(key string) (string, error) {
 	case "site":
 		return p.Site, nil
 	case "api_key":
-		if p.APIKey != "" {
-			return p.APIKey[:8] + "****", nil
-		}
-		return "", nil
+		return Mask(p.APIKey), nil
 	case "app_key":
-		if p.AppKey != "" {
-			return p.AppKey[:8] + "****", nil
-		}
-		return "", nil
+		return Mask(p.AppKey), nil
 	case "max_results":
 		if p.MaxResults == 0 {
 			return "25", nil
