@@ -41,7 +41,7 @@ Examples:
   datadog correlate                                    # last 15m
   datadog correlate --around 2026-05-19T04:54:00Z --window 10m
   datadog correlate --from 2026-05-19T04:48:54Z --to 2026-05-19T05:00:00Z
-  datadog correlate --service web-store            # filter events/signals by service tag
+  datadog correlate --service web-store                # filter events/signals by service tag
   datadog correlate --json | jq '.events[].title'`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		from, to, err := resolveCorrelateWindow()
