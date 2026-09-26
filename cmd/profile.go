@@ -30,7 +30,7 @@ var profileCreateCmd = &cobra.Command{
 		config.SetActive(name)
 
 		fmt.Println(ui.SuccessStyle.Render(fmt.Sprintf("  Created profile %q (now active)", name)))
-		fmt.Println(ui.Dimmed.Render("  Run 'datadog login' to authenticate"))
+		fmt.Println(ui.Dimmed.Render("  Run 'datadog setup' to connect"))
 
 		return nil
 	},
@@ -49,7 +49,7 @@ var profileListCmd = &cobra.Command{
 		}
 
 		if len(names) == 0 {
-			fmt.Println(ui.Dimmed.Render("  No profiles. Run 'datadog login' to create one."))
+			fmt.Println(ui.Dimmed.Render("  No profiles yet. Run 'datadog setup' to create one."))
 			return nil
 		}
 

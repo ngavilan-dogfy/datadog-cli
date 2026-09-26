@@ -37,7 +37,7 @@ Examples:
 
 		if !result.Valid {
 			fmt.Println(ui.ErrorStyle.Render("  Invalid credentials"))
-			return fmt.Errorf("API key is invalid — run 'datadog login'")
+			return fmt.Errorf("API key is invalid — run 'datadog setup'")
 		}
 
 		fmt.Println(ui.Title.Render(" Datadog CLI"))
