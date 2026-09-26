@@ -39,11 +39,21 @@ What's going on?
   datadog last                      What just fired, what was just deployed
   datadog correlate --around <time> Every signal around a moment
 
+Understand it (made for agents: facts instead of raw data, --md or --json):
+  datadog read <link>               Any Datadog link, read with its window and variables
+  datadog trace <id>                One request across services: where time went, what failed
+  datadog metrics describe "<q>"    A chart in one line: levels, changes, peaks, gaps
+  datadog logs patterns "<q>"       Thousands of logs as a few patterns; --compare 1d marks new ones
+  datadog dashboards read <id>      What every widget shows, and what's wrong with it
+  datadog monitors explain <id>     What a monitor watches, and what its data did
+  datadog coverage                  Services nobody watches, with the monitors to add
+
 Look things up:
   datadog monitors                  Monitors and their state (show, search)
   datadog logs "service:api status:error" --since 2h
   datadog metrics query "avg:system.cpu.user{*} by {host}"
   datadog dashboards · incidents · slos · hosts · events · audit · traces · rum
+  datadog api <path>                Any API endpoint, with your keys
 
 Change things (ask first when an agent does it):
   datadog monitors mute 12345 -d 1h
@@ -58,7 +68,8 @@ Keep it working:
   datadog skill install             Teach Claude Code this CLI (/datadog)
 
 DD_API_KEY, DD_APP_KEY and DD_SITE override the profile, and are enough on
-their own: no setup needed in CI or containers.`,
+their own: no setup needed in CI or containers. DATADOG_READ_ONLY=1 refuses
+every change for the session.`,
 	// Bare 'datadog': help, or a welcome that offers setup on a fresh install.
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if cfg != nil && cfg.IsAuthenticated() {
