@@ -194,3 +194,15 @@ func TestChartStyleToggleIsRemembered(t *testing.T) {
 		t.Errorf("style not saved: %s", data)
 	}
 }
+
+// Screens start loading before the terminal says how big it is; once it
+// does, charts asked for at a guessed width are asked again at the real one.
+func TestChartsFollowTheRealWidth(t *testing.T) {
+	h := newHarness(t, 140, 40)
+	h.dd.mu.Lock()
+	logs := h.dd.intervals["status:error"]
+	h.dd.mu.Unlock()
+	if logs == 0 || logs > 60_000 {
+		t.Fatalf("the logs histogram uses %d ms buckets on a 140-column screen, want ≤ 1 min", logs)
+	}
+}

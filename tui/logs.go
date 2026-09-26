@@ -19,23 +19,24 @@ import (
 // logsView is a log explorer: a query, a histogram of volume by status,
 // the matching logs and one log's detail — with a live tail.
 type logsView struct {
-	ctx     *appCtx
-	query   string
-	draft   string
-	editing bool
-	logs    []datadog.LogData
-	after   string // cursor for the next page
-	hist    *widgetData
-	err     error
-	loading bool
-	more    bool
-	live    bool
-	gen     int // query generation, so stale answers are dropped
-	cur     int
-	scroll  int
-	detail  bool
-	dscroll int
-	w, h    int
+	ctx      *appCtx
+	query    string
+	draft    string
+	editing  bool
+	logs     []datadog.LogData
+	after    string // cursor for the next page
+	hist     *widgetData
+	histCols int // the width the histogram was asked for
+	err      error
+	loading  bool
+	more     bool
+	live     bool
+	gen      int // query generation, so stale answers are dropped
+	cur      int
+	scroll   int
+	detail   bool
+	dscroll  int
+	w, h     int
 }
 
 type logsMsg struct {
@@ -75,7 +76,7 @@ func (v *logsView) Init() tea.Cmd { return v.run() }
 func (v *logsView) run() tea.Cmd {
 	v.gen++
 	v.loading, v.err, v.cur, v.scroll, v.after = true, nil, 0, 0, ""
-	api, q, gen, tr, cols := v.ctx.api, v.query, v.gen, v.ctx.tr, max(20, v.w-8)
+	api, q, gen, tr := v.ctx.api, v.query, v.gen, v.ctx.tr
 	from, to := tr.bounds()
 	fetch := func() tea.Msg {
 		resp, err := api.SearchLogsCursor(q, strconv.FormatInt(from, 10), strconv.FormatInt(to, 10), 100, "")
@@ -84,7 +85,15 @@ func (v *logsView) run() tea.Cmd {
 		}
 		return logsMsg{gen: gen, logs: resp.Data, after: resp.Meta.Page.After}
 	}
-	hist := func() tea.Msg {
+	return tea.Batch(fetch, v.histogram())
+}
+
+// histogram asks for the volume by status, about one bar per column.
+func (v *logsView) histogram() tea.Cmd {
+	api, q, gen, tr, cols := v.ctx.api, v.query, v.gen, v.ctx.tr, max(20, v.w-8)
+	v.histCols = cols
+	from, to := tr.bounds()
+	return func() tea.Msg {
 		def := map[string]any{"requests": []any{map[string]any{
 			"display_type": "bars",
 			"queries": []any{map[string]any{
@@ -96,7 +105,6 @@ func (v *logsView) run() tea.Cmd {
 		}}}
 		return logsHistMsg{gen: gen, d: limited(func() *widgetData { return fetchTimeseries(api, def, nil, from, to, cols) })}
 	}
-	return tea.Batch(fetch, hist)
 }
 
 func (v *logsView) loadMore() tea.Cmd {
@@ -159,6 +167,10 @@ func (v *logsView) Update(msg tea.Msg) (screen, tea.Cmd) {
 		if msg.gen == v.gen {
 			v.hist = msg.d
 			colorByStatus(v.hist)
+		}
+	case resizedMsg:
+		if tooCoarse(v.histCols, max(20, v.w-8)) {
+			return v, v.histogram()
 		}
 	case logsTickMsg:
 		if msg.gen == v.gen && v.live {

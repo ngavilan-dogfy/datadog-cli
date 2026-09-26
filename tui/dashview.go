@@ -135,7 +135,7 @@ func (v *dashView) fetchVisible(force bool) tea.Cmd {
 		if v.loading[w] {
 			continue
 		}
-		if d := v.data[w]; d != nil && d.key == key && !force {
+		if d := v.data[w]; d != nil && d.key == key && !force && !tooCoarse(d.cols, v.wantCols(w)) {
 			continue
 		}
 		if !needsData(w.Type) {
@@ -156,20 +156,28 @@ func needsData(t string) bool {
 	return false
 }
 
+// wantCols is how many columns a widget's data is drawn in.
+func (v *dashView) wantCols(w *widget) int {
+	if v.zoomed == w {
+		return v.w
+	}
+	return max(10, w.w-8)
+}
+
 func (v *dashView) fetch(w *widget, key string) tea.Cmd {
 	api, id := v.ctx.api, v.id
 	tvars := append([]tvar(nil), v.dash.TVars...)
 	tr := v.ctx.tr
-	cols, rows := max(10, w.w-8), max(3, w.h-1)
+	cols, rows := v.wantCols(w), max(3, w.h-1)
 	if v.zoomed == w {
-		cols, rows = v.w, v.bodyHeight()
+		rows = v.bodyHeight()
 	}
 	return func() tea.Msg {
 		d := limited(func() *widgetData { return fetchWidget(api, w, tvars, tr, cols, rows) })
 		if d == nil {
 			d = &widgetData{}
 		}
-		d.key, d.at = key, now()
+		d.key, d.at, d.cols = key, now(), cols
 		return widgetDataMsg{id: id, w: w, d: d}
 	}
 }
@@ -210,6 +218,8 @@ func (v *dashView) Update(msg tea.Msg) (screen, tea.Cmd) {
 		return v, tea.Batch(cmds...)
 	case rangeChangedMsg, tvarsChangedMsg:
 		v.cache = map[*widget]cachedRender{}
+		return v, v.fetchVisible(false)
+	case resizedMsg:
 		return v, v.fetchVisible(false)
 	case spinMsg:
 		for w := range v.loading {

@@ -28,7 +28,12 @@ type widgetData struct {
 	monSum  map[string]int
 	spark   []float64 // query_value background
 	partial string    // non-fatal problem (one request of several failed)
+	cols    int       // the width it was fetched for
 }
+
+// tooCoarse reports data fetched for far fewer columns than it's drawn in
+// now (asked before the terminal size was known, say).
+func tooCoarse(fetchedCols, wantCols int) bool { return fetchedCols*4 < wantCols*3 }
 
 type scalarRow struct {
 	label string

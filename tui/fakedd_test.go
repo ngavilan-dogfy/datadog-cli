@@ -25,6 +25,7 @@ type fakeDD struct {
 	scheduled []int64 // monitor ids muted
 	canceled  []string
 	nextDT    int
+	intervals map[string]int64 // last rollup asked per query
 }
 
 func newFakeDD() *fakeDD { return &fakeDD{downtimes: map[string]datadog.DowntimeData{}} }
@@ -100,6 +101,12 @@ func queryText(q map[string]any) string {
 func (f *fakeDD) QueryTimeseries(r datadog.FormulaRequest) (*datadog.TimeseriesResult, error) {
 	for _, q := range r.Queries {
 		f.record(queryText(q))
+		f.mu.Lock()
+		if f.intervals == nil {
+			f.intervals = map[string]int64{}
+		}
+		f.intervals[queryText(q)] = r.Interval
+		f.mu.Unlock()
 	}
 	res := &datadog.TimeseriesResult{}
 	n := 60

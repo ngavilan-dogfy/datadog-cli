@@ -76,6 +76,7 @@ type Model struct {
 
 type (
 	spinMsg         struct{}
+	resizedMsg      struct{} // after the terminal size changes
 	rangeChangedMsg struct{}
 	tvarsChangedMsg struct{}
 	pushMsg         struct{ s screen }
@@ -206,7 +207,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.w, m.h = msg.Width, msg.Height
 		m.resizeAll()
-		return m, nil
+		// Data asked for before the size was known (or for a much smaller
+		// window) is too coarse: screens refetch what needs it.
+		return m, m.broadcast(resizedMsg{})
 	case spinMsg:
 		m.ctx.spin++
 		cmd := m.broadcast(msg)
