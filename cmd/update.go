@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 
 	"github.com/ngavilan-dogfy/datadog-cli/internal/selfupdate"
 
@@ -50,7 +51,16 @@ Examples:
 			fmt.Printf("%s is available (you have %s) — run 'datadog update'\n", rel.Tag, currentBuild().Short())
 			return nil
 		}
-		err := selfupdate.Run(t, selfupdate.Options{Yes: updateYes, Interactive: interactive(), Out: os.Stdout})
+		err := selfupdate.Run(t, selfupdate.Options{
+			Yes: updateYes, Interactive: interactive(), Out: os.Stdout,
+			// The skill ships inside the binary: the new one refreshes it.
+			OnInstalled: func(path string) {
+				if skillInstalled() && exec.Command(path, "skill", "install", "--quiet").Run() == nil {
+					sayOK("Claude Code skill refreshed")
+					fmt.Println()
+				}
+			},
+		})
 		if selfupdate.IsQuiet(err) {
 			return quietError{err}
 		}

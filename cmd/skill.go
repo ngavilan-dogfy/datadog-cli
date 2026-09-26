@@ -15,6 +15,8 @@ import (
 //go:embed skill_data/SKILL.md
 var skillMD []byte
 
+var skillQuiet bool
+
 var skillCmd = &cobra.Command{
 	Use:   "skill",
 	Short: "Manage the Claude Code skill (/datadog)",
@@ -50,6 +52,9 @@ var skillInstallCmd = &cobra.Command{
 		}
 		if err := os.WriteFile(dest, skillMD, 0o644); err != nil {
 			return fmt.Errorf("write skill: %w", err)
+		}
+		if skillQuiet {
+			return nil
 		}
 		fmt.Println()
 		sayOK("Claude Code skill installed " + wzMuted.Render(tildePath(dest)))
@@ -105,7 +110,19 @@ var skillStatusCmd = &cobra.Command{
 	},
 }
 
+// skillInstalled reports whether the user has the skill, so updates can
+// refresh it.
+func skillInstalled() bool {
+	dest, err := skillPath()
+	if err != nil {
+		return false
+	}
+	_, err = os.Stat(dest)
+	return err == nil
+}
+
 func init() {
+	skillInstallCmd.Flags().BoolVarP(&skillQuiet, "quiet", "q", false, "Print nothing on success (for scripts and installers)")
 	skillCmd.AddCommand(skillInstallCmd, skillRemoveCmd, skillStatusCmd)
 	rootCmd.AddCommand(skillCmd)
 }

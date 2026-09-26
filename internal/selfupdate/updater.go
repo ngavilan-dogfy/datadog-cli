@@ -45,6 +45,9 @@ type Options struct {
 	Yes         bool      // don't ask for confirmation
 	Interactive bool      // a person at a terminal: show the inline UI
 	Out         io.Writer // where plain progress goes when not interactive
+	// OnInstalled runs after a new version is in place, with its path: the
+	// hook for work only the new binary can do (refreshing files it embeds).
+	OnInstalled func(path string)
 }
 
 // Run checks for a newer release and installs it. It returns nil when the
@@ -70,7 +73,13 @@ func Run(t Tool, opts Options) error {
 		}
 		return nil
 	}
-	return m.install(opts.Out)
+	if err := m.install(opts.Out); err != nil {
+		return err
+	}
+	if opts.OnInstalled != nil {
+		opts.OnInstalled(m.target)
+	}
+	return nil
 }
 
 // errQuiet signals a failure the UI already explained.
@@ -492,5 +501,8 @@ func runPlain(t Tool, opts Options, target string) error {
 		check = ", checksum verified"
 	}
 	fmt.Fprintf(out, "updated %s %s → %s (%s%s)\n", t.Binary, t.Current, rel.Tag, target, check)
+	if opts.OnInstalled != nil {
+		opts.OnInstalled(target)
+	}
 	return nil
 }
