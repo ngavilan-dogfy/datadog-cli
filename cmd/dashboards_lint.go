@@ -197,7 +197,7 @@ func walkWidgets(widgets []interface{}, path string, findings *[]lintFinding, us
 					Message: "Group widget is empty.",
 				})
 			}
-			walkWidgets(inner, wPath+".widgets", findings, usedVars)
+			walkWidgets(inner, wPath+".definition.widgets", findings, usedVars)
 			continue
 		}
 
@@ -239,7 +239,9 @@ func walkWidgets(widgets []interface{}, path string, findings *[]lintFinding, us
 
 		hasEnv := false
 		hasService := false
+		tagged := false // queries whose data always carries env and service
 		for _, q := range queries {
+			tagged = tagged || envTagged(q)
 			if strings.Contains(q, "env:") || strings.Contains(q, "$env") {
 				hasEnv = true
 			}
@@ -251,14 +253,14 @@ func walkWidgets(widgets []interface{}, path string, findings *[]lintFinding, us
 				usedVars[m[1]] = true
 			}
 		}
-		if len(queries) > 0 && !hasEnv {
+		if tagged && !hasEnv {
 			*findings = append(*findings, lintFinding{
 				Severity: "warning", Rule: "query-no-env",
 				WidgetIndex: idx, WidgetPath: wPath,
 				Message: "Widget query does not filter by env — risk of cross-env data leak.",
 			})
 		}
-		if len(queries) > 0 && !hasService && !looksInfraWidget(wType, title) {
+		if tagged && !hasService && !looksInfraWidget(wType, title) {
 			*findings = append(*findings, lintFinding{
 				Severity: "info", Rule: "query-no-service",
 				WidgetIndex: idx, WidgetPath: wPath,
@@ -294,10 +296,21 @@ func walkWidgets(widgets []interface{}, path string, findings *[]lintFinding, us
 			*findings = append(*findings, lintFinding{
 				Severity: "info", Rule: "missing-threshold-marker",
 				WidgetIndex: idx, WidgetPath: wPath,
-				Message: "Error/latency widget has no threshold markers — readers can't tell what's bad at a glance.",
+				Message: "Error/latency widget has no thresholds (markers or conditional formats) — readers can't tell what's bad at a glance.",
 			})
 		}
 	}
+}
+
+// envTagged says whether a query's data always has env and service tags:
+// APM and runtime metrics, and log/span/RUM searches. Integration metrics
+// (gcp.*, aws.*, mongodb.atlas.*, system.*) only have them if the hosts were
+// tagged, so a missing env filter there is no smell.
+func envTagged(q string) bool {
+	if !strings.Contains(q, "{") {
+		return true // a search, not a metric query
+	}
+	return strings.Contains(q, "trace.") || strings.Contains(q, "runtime.")
 }
 
 // extractQueries pulls all the query strings out of a widget definition
@@ -326,6 +339,16 @@ func extractQueries(def map[string]interface{}) []string {
 			}
 			if s, ok := qm["search"].(map[string]interface{}); ok {
 				if q, ok := s["query"].(string); ok && q != "" {
+					out = append(out, q)
+				}
+			}
+		}
+	}
+	// list_stream: requests[].query.query_string
+	for _, r := range reqs {
+		if rm, ok := r.(map[string]interface{}); ok {
+			if qm, ok := rm["query"].(map[string]interface{}); ok {
+				if q, ok := qm["query_string"].(string); ok {
 					out = append(out, q)
 				}
 			}
@@ -363,9 +386,21 @@ func extractFormulas(def map[string]interface{}) []string {
 	return out
 }
 
+// hasMarkers says whether a widget shows what's bad: markers on a chart,
+// or conditional formats (colors) on a request.
 func hasMarkers(def map[string]interface{}) bool {
-	m, ok := def["markers"].([]interface{})
-	return ok && len(m) > 0
+	if m, ok := def["markers"].([]interface{}); ok && len(m) > 0 {
+		return true
+	}
+	reqs, _ := def["requests"].([]interface{})
+	for _, r := range reqs {
+		if rm, ok := r.(map[string]interface{}); ok {
+			if cf, ok := rm["conditional_formats"].([]interface{}); ok && len(cf) > 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // extractQueryNames returns the `name` attribute of each query in v2 requests.
