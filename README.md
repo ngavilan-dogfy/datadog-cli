@@ -24,6 +24,8 @@ datadog ui
 
 No keys at hand? `datadog ui --demo` opens a made-up web store whose checkout is having a bad afternoon, so you can look around first. Nothing leaves your machine.
 
+The installer picks the build for your computer, checks it against the release's checksums, puts it in `~/.local/bin` (no sudo), offers to add that folder to your `PATH`, and offers to run `datadog setup`. Run it again any time: it updates in place.
+
 `datadog setup` asks for three things and checks each one against Datadog before going on:
 
 1. **Site**: pick yours from the list, or paste any link from your Datadog (a dashboard, a monitor) and the site is taken from it.
@@ -132,7 +134,7 @@ It shows what's new, downloads the release for your machine, checks its checksum
 <details>
 <summary><strong>Other ways to install</strong></summary>
 
-- **A specific version or folder**: `curl -fsSL …/install.sh | DATADOG_VERSION=v1.2.0 DATADOG_INSTALL_DIR=/usr/local/bin sh`
+- **A specific version or folder**: `curl -fsSL …/install.sh | DATADOG_VERSION=v1.2.0 DATADOG_INSTALL_DIR=~/bin sh` (`DATADOG_NO_SETUP=1` and `DATADOG_NO_MODIFY_PATH=1` keep it from asking).
 - **With Go**: `go install github.com/ngavilan-dogfy/datadog-cli/cmd/datadog@latest`
 - **By hand**: download `datadog-<os>-<arch>` from the [latest release](https://github.com/ngavilan-dogfy/datadog-cli/releases/latest), check it against `checksums.txt`, make it executable and put it in your `PATH`. Windows: `datadog-windows-amd64.exe`.
 - **From source**: `make install` builds and copies to `~/.local/bin`.
