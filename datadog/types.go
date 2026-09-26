@@ -297,11 +297,19 @@ type SLO struct {
 	Description   string             `json:"description"`
 	Tags          []string           `json:"tags"`
 	Type          string             `json:"type"` // metric, monitor
+	Query         *SLOQuery          `json:"query,omitempty"`
+	MonitorIDs    []int64            `json:"monitor_ids,omitempty"`
 	Thresholds    []SLOThreshold     `json:"thresholds"`
 	Creator       Creator            `json:"creator"`
 	CreatedAt     int64              `json:"created_at"`
 	ModifiedAt    int64              `json:"modified_at"`
 	OverallStatus []SLOOverallStatus `json:"overall_status"`
+}
+
+// SLOQuery is a metric SLO's good/total events.
+type SLOQuery struct {
+	Numerator   string `json:"numerator"`
+	Denominator string `json:"denominator"`
 }
 
 type SLOThreshold struct {
