@@ -79,7 +79,8 @@ func TestDashboardZoomAndGroups(t *testing.T) {
 	}
 	h.expect("sum:requests{env:prod} by {host}", "host:a", "host:b")
 	h.keys("<left><left>")
-	h.screen()
+	// The legend says when the cursor is and shows the widget's markers.
+	h.expect("at ", "╌ marker 80%")
 	h.keys("o")
 	if len(h.opened) == 0 || !strings.Contains(h.opened[len(h.opened)-1], "fullscreen_widget=") {
 		t.Errorf("o in a zoomed widget should open it fullscreen in Datadog: %q", h.opened)

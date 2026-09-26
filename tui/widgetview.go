@@ -185,8 +185,8 @@ func timeseriesLines(w *widget, d *widgetData, width, height int, o renderOpts) 
 	}
 	legendRows := 0
 	switch {
-	case o.zoom:
-		legendRows = min(len(d.series), max(1, height/3))
+	case o.zoom: // the series, plus a line with the time and the markers
+		legendRows = min(len(d.series), max(1, height/3)) + 1
 	case height >= 9 && len(d.series) > 1:
 		legendRows = 1
 	}
@@ -208,11 +208,26 @@ func timeseriesLines(w *widget, d *widgetData, width, height int, o renderOpts) 
 	if legendRows == 0 {
 		return lines
 	}
-	var values []float64
-	if o.zoom && o.cursor >= 0 {
-		_, values = c.At(o.cursor)
+	if !o.zoom {
+		return append(lines, legendLines(d, nil, width, legendRows, false)...)
 	}
-	return append(lines, legendLines(d, values, width, legendRows, o.zoom)...)
+	var values []float64
+	when := sMuted().Render("latest")
+	if o.cursor >= 0 {
+		var t int64
+		t, values = c.At(o.cursor)
+		when = sMuted().Render("at ") + time.UnixMilli(t).Local().Format("Jan 2 15:04")
+	}
+	head := "  " + when
+	for _, m := range c.Markers {
+		label := m.Label
+		if label == "" {
+			label = "marker"
+		}
+		head += "    " + fg(m.Color).Render("╌ "+label+" "+viz.Format(m.Value, d.unit))
+	}
+	lines = append(lines, fit(head, width))
+	return append(lines, legendLines(d, values, width, legendRows-1, true)...)
 }
 
 // legendLines lists series with their last value (or the value under the
