@@ -24,7 +24,7 @@ var (
 	stBad    = lipgloss.NewStyle().Foreground(lipgloss.Color("1")).Bold(true)
 	stMuted  = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 	stBold   = lipgloss.NewStyle().Bold(true)
-	stKey    = lipgloss.NewStyle().Foreground(lipgloss.Color("0")).Background(lipgloss.Color("5")).Bold(true).Padding(0, 1)
+	stKey    = lipgloss.NewStyle().Foreground(lipgloss.Color("5")).Reverse(true).Bold(true).Padding(0, 1) // reverse: the text takes the terminal's own background, readable in any theme
 )
 
 type phase int
