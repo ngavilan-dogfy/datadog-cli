@@ -90,7 +90,28 @@ Every command adapts to where its output goes:
 
 With `--json`, a failure also writes one parseable line to stderr, `{"error":"..."}`, and exits with 1. `NO_COLOR` is honored.
 
-Three commands exist mostly for automation:
+Agents can't look at charts, so a set of commands does the reading for them and returns facts, at a fraction of the size of the raw data (each takes `--md` and `--json`):
+
+```console
+$ datadog metrics describe "p95:trace.http.request{service:checkout}" --since 6h --compare 1d
+p95:trace.http.request{service:checkout} · May 19 04:00 → 10:00 CEST
+  service:checkout: ~120ms; rose to ~480ms at 09:38 (×4); peak 1.2s at 09:52; last 450ms · vs 1d before: ×3.1
+
+$ datadog logs patterns "service:checkout status:error" --since 1h --compare 1d
+    ≈COUNT   SHARE  VS 1D   SERVICE   LEVEL  LAST    PATTERN
+     4,321   35.0%  new     checkout  error  09:58   TimeoutError: payments.authorize timed out after <num>ms
+       912    7.4%  ×1.1    checkout  error  09:57   Payment declined for customer <*>: card expired
+```
+
+- **`datadog read <link>`**: paste any Datadog link (dashboard, monitor, trace, logs search, APM service, metric, incident, SLO) and get what it shows, with the link's time window and template variables.
+- **`datadog trace <id>`**: one request across services: the span tree as a waterfall, the critical path, each span's own time, repeated calls (N+1), the error that started it all, and the logs written during the request.
+- **`datadog dashboards read <id>`**: every widget described (each line of a chart, the numbers, monitors in alert, log patterns) and what's wrong with it: failing queries, no data and why, always zero, unreadable charts, duplicates. `--file draft.json` checks a dashboard you're writing against real data, and `datadog ui --file draft.json` previews it, reloading every time the file changes.
+- **`datadog monitors explain <id>`**: what a monitor evaluates, who it wakes, which groups aren't OK, and what its data did against the threshold, rolled up the way the monitor does it.
+- **`datadog coverage`**: every service with traffic or error logs against the monitors, SLOs and owners that watch it, and the gaps, each with the monitor query that would close it.
+- **`datadog metrics tags <metric>`**: the tag values that exist, so queries don't come back empty (`env:production`, not `env:prod`). When one does, the CLI says why.
+- **`datadog api <path>`**: any endpoint of the API with your profile's keys, like `gh api`. Changes ask for confirmation.
+
+Three more exist mostly for automation:
 
 - **`datadog triage --json`**: one call, the whole picture. Alerting monitors (with their query and message), open incidents, SLOs at risk, error logs, events, audit-trail changes, security signals, CI pipelines, active downtimes and hosts up, fetched concurrently. Narrow it with `--since 15m`, `--service api --env prod` or `--around <time>`. A `summary` block comes first, and sections that failed are listed under `errors` without spoiling the rest.
 - **`datadog services context <service> --json`**: everything about one service: catalog entry, monitors, SLOs, log volume by status, error logs, failing endpoints from APM, deploys and downtimes.
@@ -108,17 +129,17 @@ This installs the `/datadog` skill, so Claude Code knows how to investigate with
 
 | Area | Commands |
 |---|---|
-| What's going on | `triage`, `status`, `last`, `correlate` |
-| Monitors | `monitors` (`show`, `search`, `mute`, `unmute`, `create`, `edit`, `delete`, `export`, `import`), `batch mute/unmute` |
-| Logs | `logs` (`--all`, `--jsonl`), `logs tail`, `logs aggregate` |
-| Metrics | `metrics search/query/meta`, `tags` |
-| Dashboards | `dashboards` (`get`, `open`, `create`, `clone`, `export`, `import`, `delete`, `lint`) |
+| What's going on | `triage`, `status`, `last`, `correlate`, `read`, `coverage` |
+| Monitors | `monitors` (`show`, `explain`, `search`, `mute`, `unmute`, `create`, `edit`, `delete`, `export`, `import`), `batch mute/unmute` |
+| Logs | `logs` (`--all`, `--jsonl`), `logs tail`, `logs aggregate`, `logs patterns` |
+| Metrics | `metrics search/query/describe/tags/meta`, `tags` |
+| Dashboards | `dashboards` (`get`, `read`, `open`, `create`, `clone`, `export`, `import`, `delete`, `lint`) |
 | Incidents and SLOs | `incidents` (`show`, `create`, `update`), `slos` |
-| Traces and RUM | `traces`, `rum` |
+| Traces and RUM | `trace`, `traces`, `rum` |
 | Infrastructure | `hosts` (`mute`, `unmute`), `services` (`show`, `context`), `integrations` |
 | CI/CD | `pipelines`, `deploy`, `synthetics` (`show`, `trigger`) |
 | Security | `security`, `audit` |
-| Other | `events` (`post`), `downtimes` (`schedule`, `cancel`), `notebooks`, `usage`, `open`, `ui` |
+| Other | `events` (`post`), `downtimes` (`schedule`, `cancel`), `notebooks`, `usage`, `open`, `ui`, `api` |
 | This CLI | `setup`, `doctor`, `update`, `version`, `skill`, `whoami`, `profile`, `config`, `logout`, `schema`, `completion` |
 
 `datadog <command> --help` explains each one, with examples.

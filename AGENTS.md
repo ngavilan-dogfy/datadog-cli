@@ -13,7 +13,43 @@ datadog schema logs --full     # one subtree, with full help text and examples
 ```
 
 Every entry reports `json_output: true/false` so you know which commands can
-return structured data.
+return structured data, and `mutates: true` on the ones that change Datadog.
+
+### Read descriptions, not raw data
+
+Raw series and log dumps are big and hard to reason about. These commands do
+the reading and hand you facts to quote (all take `--md` and `--json`):
+
+```sh
+datadog read "<any Datadog link>"                       # dashboard, monitor, trace, logs, APM service, metric…
+datadog metrics describe "p95:trace.http.request{service:api}" --since 6h --compare 1d
+#   service:api: ~120ms; rose to ~480ms at 09:38 (×4); peak 1.2s at 09:52; last 450ms · vs 1d before: ×3.1
+datadog logs patterns "service:api status:error" --since 1h --compare 1d
+#   ≈4,321  35%  api  error  new  Payment declined for customer <*>: <*>
+datadog trace <trace_id>                                # span tree, critical path, own time, N+1, errors, logs
+datadog dashboards read <id | link | --file x.json>     # every widget described + its problems (JSON paths)
+datadog monitors explain <id>                           # thresholds, who it wakes, what its data did
+datadog coverage                                        # per service: monitors, SLOs, owner, gaps + fixes
+datadog metrics tags <metric>                           # real tag keys/values and series count
+```
+
+Empty metric queries explain themselves when they can ("env:prod isn't a
+value of env for trace.x (it has: production)").
+
+### Designing dashboards and monitors
+
+1. Learn the data: `metrics search`, `metrics tags`, `metrics describe --since 7d`.
+2. Write the dashboard JSON (or `dashboards export <id> -o draft.json`).
+3. Validate against real data: `datadog dashboards read --file draft.json --problems`.
+4. The user previews it: `datadog ui --file draft.json` reloads on every save.
+5. After a yes: `datadog dashboards create --file draft.json`.
+
+### Anything else: the raw API
+
+`datadog api <path>` calls any endpoint with the profile's keys (like
+`gh api`): `-q k=v` query params, `-F k=v` typed JSON fields (`a.b=1` nests),
+`--input file`. GETs and searches run straight away; other methods ask to
+confirm (or `--yes`), and read-only profiles refuse them.
 
 ### Gather context (start here)
 
@@ -94,14 +130,19 @@ agent-config noise; `@evt.name:Monitor` narrows to monitor changes;
 - Timestamps: RFC3339 (`2026-05-19T04:54:00Z`) or epoch seconds/millis both
   accepted by `--from/--to/--around`.
 - Durations: `30m`, `2h`, `1d` accepted by `--since`, `--window`, `--duration`.
-- The client retries 429 (honoring `Retry-After`) and 5xx automatically —
-  do not implement retries on top.
+- The client retries 429 (waiting for `X-RateLimit-Reset`) and 5xx
+  automatically — do not implement retries on top. Log search is limited to
+  ~3 calls per 10 s: prefer `logs patterns` / `logs aggregate` to paging.
+- Read-only profiles (`read_only: true`, or `DATADOG_READ_ONLY=1`) refuse
+  every mutating command.
 
 ### Mutating commands — ask before running
 
-`monitors mute/unmute/create/update/delete`, `hosts mute/unmute`,
+`monitors mute/unmute/create/edit/import/delete`, `hosts mute/unmute`,
 `downtimes schedule/cancel`, `incidents create/update`, `events post`,
-`dashboards create/update/delete`, `batch mute/unmute`, `synthetics trigger`.
+`deploy`, `dashboards create/clone/import/delete`, `batch mute/unmute`,
+`synthetics trigger`, `tags add/set/rm`, `integrations … set/clear`, and
+`api` with any method but GET. `datadog schema` marks them `mutates: true`.
 Everything else is read-only.
 
 ## Developing this repo
@@ -112,8 +153,10 @@ Everything else is read-only.
 - `datadog/` is a hand-rolled HTTP client (no official SDK). Types in
   `datadog/types*.go` model the *real* responses: check shapes against the
   live API, the docs have drifted before.
-- `tui/` is `datadog ui` (Bubble Tea); `viz/` draws charts, sparklines and
-  big numbers; `internal/demo/` is the made-up org behind `ui --demo`;
+- `tui/` is `datadog ui` (Bubble Tea); `tui/report.go` reads a dashboard
+  into text for `dashboards read`; `viz/` draws charts, sparklines and
+  big numbers; `internal/series` describes a time series in words;
+  `internal/logpattern` folds log messages into patterns; `internal/demo/` is the made-up org behind `ui --demo`;
   `internal/selfupdate/` is `update` and the update notice (kept identical
   across the ngavilan-dogfy CLIs); `internal/uiprefs/` remembers the chart
   style.
