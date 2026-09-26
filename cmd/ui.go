@@ -14,6 +14,7 @@ import (
 var (
 	uiTab  string
 	uiDemo bool
+	uiFile string
 )
 
 var _ tui.API = (*demo.API)(nil)
@@ -42,11 +43,18 @@ Examples:
   datadog ui abc-def-ghi               # open a dashboard right away
   datadog ui https://app.datadoghq.eu/dashboard/abc-def-ghi/on-call
   datadog ui --tab monitors
+  datadog ui --file new-dashboard.json # preview a dashboard you're writing; reloads on save
   datadog ui --demo                    # try it with a made-up org, no keys needed`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if uiFile != "" {
+			if _, err := readDashboardFile(uiFile); err != nil {
+				return err
+			}
+		}
 		if uiDemo {
-			opts := tui.Options{Site: "demo · acme shop", Profile: "demo", Tab: strings.ToLower(uiTab), Demo: true}
+			opts := tui.Options{Site: "demo · acme shop", Profile: "demo", Tab: strings.ToLower(uiTab), Demo: true,
+				DashboardFile: uiFile, LoadFile: readDashboardFile}
 			if len(args) == 1 {
 				opts.Dashboard = dashboardID(args[0])
 			}
@@ -56,7 +64,8 @@ Examples:
 			return fmt.Errorf("not connected — run 'datadog setup' to get started")
 		}
 		opts := tui.Options{Site: cfg.Site, Profile: cfg.Name, Tab: strings.ToLower(uiTab),
-			UpdateNotes: selfupdate.KnownNewer(updateTool(), cacheDir())}
+			UpdateNotes: selfupdate.KnownNewer(updateTool(), cacheDir()), DashboardFile: uiFile, LoadFile: readDashboardFile,
+			ReadOnly: cfg.ReadOnly}
 		if len(args) == 1 {
 			opts.Dashboard = dashboardID(args[0])
 		}
@@ -77,6 +86,7 @@ func dashboardID(s string) string {
 
 func init() {
 	uiCmd.Flags().StringVar(&uiTab, "tab", "", "Tab to start on: now, dashboards, monitors, logs, metrics")
+	uiCmd.Flags().StringVarP(&uiFile, "file", "f", "", "Preview a dashboard JSON/YAML file, reloading it when it changes")
 	uiCmd.Flags().BoolVar(&uiDemo, "demo", false, "Explore a made-up Datadog org (no keys needed, nothing leaves your machine)")
 	rootCmd.AddCommand(uiCmd)
 }

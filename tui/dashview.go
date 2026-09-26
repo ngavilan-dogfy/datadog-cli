@@ -2,6 +2,8 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -29,6 +31,16 @@ type dashView struct {
 	cursor  int
 	lastRef time.Time
 	cache   map[*widget]cachedRender
+
+	// A dashboard file being previewed: reloaded when it changes.
+	file    string
+	load    func(string) (map[string]any, error)
+	fileMod time.Time
+}
+
+type dashFileMsg struct {
+	id  string
+	mod time.Time
 }
 
 type cachedRender struct {
@@ -59,6 +71,12 @@ func (v *dashView) Title() string { return v.title }
 
 func (v *dashView) Init() tea.Cmd {
 	api, id := v.ctx.api, v.id
+	if v.file != "" {
+		if st, err := os.Stat(v.file); err == nil {
+			v.fileMod = st.ModTime()
+		}
+		return tea.Batch(v.loadFile(), v.tick(), v.watchFile())
+	}
 	return tea.Batch(func() tea.Msg {
 		m, err := api.GetDashboard(id)
 		if err != nil {
@@ -66,6 +84,29 @@ func (v *dashView) Init() tea.Cmd {
 		}
 		return dashLoadedMsg{id: id, dash: parseDashboard(m)}
 	}, v.tick())
+}
+
+func (v *dashView) loadFile() tea.Cmd {
+	id, path, load := v.id, v.file, v.load
+	return func() tea.Msg {
+		m, err := load(path)
+		if err != nil {
+			return dashLoadedMsg{id: id, err: err}
+		}
+		return dashLoadedMsg{id: id, dash: parseDashboard(m)}
+	}
+}
+
+// watchFile checks the previewed file every second.
+func (v *dashView) watchFile() tea.Cmd {
+	id, path := v.id, v.file
+	return tickFn(time.Second, func(time.Time) tea.Msg {
+		st, err := os.Stat(path)
+		if err != nil {
+			return dashFileMsg{id: id}
+		}
+		return dashFileMsg{id: id, mod: st.ModTime()}
+	})
 }
 
 func (v *dashView) tick() tea.Cmd {
@@ -184,9 +225,28 @@ func (v *dashView) fetch(w *widget, key string) tea.Cmd {
 
 func (v *dashView) Update(msg tea.Msg) (screen, tea.Cmd) {
 	switch msg := msg.(type) {
+	case dashFileMsg:
+		if msg.id != v.id {
+			return v, nil
+		}
+		if !msg.mod.IsZero() && !msg.mod.Equal(v.fileMod) {
+			v.fileMod = msg.mod
+			return v, tea.Batch(v.loadFile(), v.watchFile())
+		}
+		return v, v.watchFile()
 	case dashLoadedMsg:
 		if msg.id != v.id {
 			return v, nil
+		}
+		if v.file != "" && v.dash != nil {
+			// A save mid-edit can be half a file: keep showing the last good one.
+			if msg.err != nil {
+				return v, toast("Can't read "+filepath.Base(v.file)+": "+msg.err.Error(), toastErr)
+			}
+			v.dash, v.err = msg.dash, nil
+			v.data, v.loading, v.cache = map[*widget]*widgetData{}, map[*widget]bool{}, map[*widget]cachedRender{}
+			v.relayout()
+			return v, tea.Batch(v.fetchVisible(false), toast("Reloaded "+filepath.Base(v.file), toastInfo))
 		}
 		v.dash, v.err = msg.dash, msg.err
 		if v.dash != nil {
@@ -347,8 +407,14 @@ func (v *dashView) key(k tea.KeyMsg) (screen, tea.Cmd) {
 		v.lastRef = now()
 		return v, v.fetchVisible(true)
 	case "o":
+		if v.file != "" {
+			return v, toast("A local file: 'datadog dashboards create --file "+filepath.Base(v.file)+"' puts it in Datadog", toastInfo)
+		}
 		return v, openURL(v.ctx.api.DashboardURL(v.id))
 	case "O":
+		if v.file != "" {
+			return v, toast("A local file: 'datadog dashboards create --file "+filepath.Base(v.file)+"' puts it in Datadog", toastInfo)
+		}
 		if w := v.focused(); w != nil {
 			return v, openURL(v.widgetURL(w))
 		}
@@ -365,6 +431,9 @@ func (v *dashView) key(k tea.KeyMsg) (screen, tea.Cmd) {
 }
 
 func (v *dashView) widgetURL(w *widget) string {
+	if v.file != "" {
+		return ""
+	}
 	u := v.ctx.api.DashboardURL(v.id)
 	if w != nil && w.ID != 0 {
 		u += fmt.Sprintf("?fullscreen_widget=%d", w.ID)

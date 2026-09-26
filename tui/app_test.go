@@ -1,10 +1,12 @@
 package tui
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/ngavilan-dogfy/datadog-cli/viz"
 
@@ -218,5 +220,54 @@ func TestDashboardFromTheCommandLineUsesTheRealWidth(t *testing.T) {
 	dd.mu.Unlock()
 	if iv == 0 || iv > 120_000 {
 		t.Fatalf("a 9-column-wide time series on a 160-column screen asked for %d ms points", iv)
+	}
+}
+
+func TestReadOnlyProfileCantMute(t *testing.T) {
+	dd := newFakeDD()
+	h := newHarnessWith(t, dd, Options{Site: "datadoghq.eu", Profile: "test", ReadOnly: true}, 140, 40)
+	h.keys("3")
+	h.expect("High CPU on api")
+	h.keys("m")
+	h.reject("Mute «High CPU on api»")
+	h.expect("Read-only profile")
+	h.keys("u")
+	if len(dd.scheduled)+len(dd.canceled) != 0 {
+		t.Fatalf("a read-only profile changed downtimes: %v %v", dd.scheduled, dd.canceled)
+	}
+}
+
+func TestDashboardFilePreviewReloads(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "draft.json")
+	write := func(title string) {
+		src := `{"title": "Draft", "widgets": [{"definition": {"type": "note", "content": "` + title + `"}}]}`
+		if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	load := func(p string) (map[string]any, error) {
+		var m map[string]any
+		b, err := os.ReadFile(p)
+		if err != nil {
+			return nil, err
+		}
+		return m, json.Unmarshal(b, &m)
+	}
+	write("First version")
+	dd := newFakeDD()
+	h := newHarnessWith(t, dd, Options{Site: "datadoghq.eu", Profile: "test", DashboardFile: path, LoadFile: load}, 120, 30)
+	h.expect("Draft", "First version")
+	write("Second version")
+	h.dispatch(dashFileMsg{id: "file:" + path, mod: time.Now().Add(time.Hour)})
+	h.expect("Second version", "Reloaded draft.json")
+	// Half-written file: keep the last good one.
+	if err := os.WriteFile(path, []byte(`{"title": "Dra`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	h.dispatch(dashFileMsg{id: "file:" + path, mod: time.Now().Add(2 * time.Hour)})
+	h.expect("Second version", "Can't read draft.json")
+	h.keys("o")
+	if len(h.opened) != 0 {
+		t.Errorf("a local file has nothing to open in Datadog: %v", h.opened)
 	}
 }

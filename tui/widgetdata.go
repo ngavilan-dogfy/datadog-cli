@@ -229,6 +229,7 @@ func fetchTimeseries(api API, def map[string]any, tvars []tvar, from, to int64, 
 				Name:   seriesName(spec, s),
 				Color:  paletteColor(spec.palette, len(d.series), pal),
 				Points: pts,
+				Unit:   vizUnit(s.Unit),
 			})
 		}
 	}

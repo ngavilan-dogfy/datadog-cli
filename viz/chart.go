@@ -39,6 +39,7 @@ type Series struct {
 	Name   string
 	Color  lipgloss.TerminalColor
 	Points []Point
+	Unit   Unit // when it differs from the chart's (two axes' worth of data)
 }
 
 // Marker is a horizontal reference line, like a monitor threshold.

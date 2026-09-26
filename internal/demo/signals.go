@@ -288,6 +288,16 @@ func listOf(tag, v string) []string {
 // ─── series ──────────────────────────────────────────────────────
 
 // family classifies a metric name.
+var metricSet = func() map[string]bool {
+	m := map[string]bool{}
+	for _, n := range metricNames {
+		m[n] = true
+	}
+	return m
+}()
+
+func knownMetric(name string) bool { return metricSet[strings.ToLower(name)] }
+
 func family(metric string) string {
 	m := strings.ToLower(metric)
 	switch {
@@ -491,6 +501,9 @@ func (a *API) value(q metricQuery, group []string, t time.Time, step time.Durati
 func (a *API) series(q metricQuery, from, to time.Time, step time.Duration) (times []int64, out []namedSeries) {
 	for t := from; t.Before(to); t = t.Add(step) {
 		times = append(times, t.UnixMilli())
+	}
+	if !knownMetric(q.metric) {
+		return times, nil // like Datadog: a metric nobody sends has no series
 	}
 	for _, g := range groupsFor(q.by, q.scope) {
 		vals := make([]float64, len(times))

@@ -4,6 +4,7 @@ package tui
 
 import (
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"time"
@@ -35,15 +36,16 @@ type hint struct{ key, label string }
 
 // appCtx is what screens share.
 type appCtx struct {
-	api     API
-	site    string
-	style   viz.Style
-	tr      timeRange
-	spin    int
-	update  string // newer release available, if any
-	repos   string // folder with git checkouts (for investigations)
-	profile string
-	demo    bool // made-up data: no links, no hand-offs
+	api      API
+	site     string
+	style    viz.Style
+	tr       timeRange
+	spin     int
+	update   string // newer release available, if any
+	repos    string // folder with git checkouts (for investigations)
+	profile  string
+	demo     bool // made-up data: no links, no hand-offs
+	readOnly bool // the profile may only read: no muting
 
 	// shared lists, for the command palette
 	dashboards []datadog.DashboardSummary
@@ -52,12 +54,18 @@ type appCtx struct {
 
 // Options configures the UI at start.
 type Options struct {
-	Site        string
-	Profile     string
-	Dashboard   string // open this dashboard (id) right away
-	Tab         string // now, dashboards, monitors, logs, metrics
-	UpdateNotes string // newer release available
-	Demo        bool   // the API is the demo org (datadog ui --demo)
+	Site      string
+	Profile   string
+	Dashboard string // open this dashboard (id) right away
+	// DashboardFile opens a dashboard JSON/YAML file instead, read with
+	// LoadFile, and reloads it whenever the file changes: a live preview
+	// of a dashboard being written.
+	DashboardFile string
+	LoadFile      func(path string) (map[string]any, error)
+	Tab           string // now, dashboards, monitors, logs, metrics
+	UpdateNotes   string // newer release available
+	Demo          bool   // the API is the demo org (datadog ui --demo)
+	ReadOnly      bool   // the profile is read-only: changes are refused
 }
 
 type tab struct {
@@ -147,7 +155,7 @@ var openURL = func(u string) tea.Cmd {
 // New builds the UI. Call Run to start it.
 func New(api API, opts Options) *Model {
 	ctx := &appCtx{api: api, site: opts.Site, profile: opts.Profile, tr: timeRange{span: time.Hour},
-		style: uiprefs.VizStyle(), update: opts.UpdateNotes, demo: opts.Demo}
+		style: uiprefs.VizStyle(), update: opts.UpdateNotes, demo: opts.Demo, readOnly: opts.ReadOnly}
 	m := &Model{ctx: ctx, opts: opts}
 	m.tabs = []*tab{
 		{name: "Now", stack: []screen{newHome(ctx)}},
@@ -166,7 +174,13 @@ func New(api API, opts Options) *Model {
 	case "metrics":
 		m.active = 4
 	}
-	if opts.Dashboard != "" {
+	switch {
+	case opts.DashboardFile != "" && opts.LoadFile != nil:
+		m.active = 1
+		v := newDashView(ctx, "file:"+opts.DashboardFile, filepath.Base(opts.DashboardFile))
+		v.file, v.load = opts.DashboardFile, opts.LoadFile
+		m.tabs[1].stack = append(m.tabs[1].stack, v)
+	case opts.Dashboard != "":
 		m.active = 1
 		m.tabs[1].stack = append(m.tabs[1].stack, newDashView(ctx, opts.Dashboard, opts.Dashboard))
 	}

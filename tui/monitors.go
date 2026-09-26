@@ -151,6 +151,10 @@ func newMutePicker(ctx *appCtx, m datadog.Monitor) modal {
 	return p
 }
 
+func readOnlyToast() tea.Cmd {
+	return toast("Read-only profile: muting is off (read_only in the profile, or DATADOG_READ_ONLY)", toastInfo)
+}
+
 func cmdUnmute(api API, id int64, downtimes []string) tea.Cmd {
 	return func() tea.Msg {
 		if len(downtimes) == 0 {
@@ -332,12 +336,16 @@ func (l *monitorList) Update(msg tea.Msg) (screen, tea.Cmd) {
 				return l, nil
 			}
 			return l, push(newMonitorView(l.ctx, l.rows[l.cur].mon.ID))
-		case "m":
-			if m := l.selected(); m != nil {
-				return l, openModal(newMutePicker(l.ctx, *m))
+		case "m", "u":
+			if l.ctx.readOnly {
+				return l, readOnlyToast()
 			}
-		case "u":
-			if m := l.selected(); m != nil {
+			m := l.selected()
+			switch {
+			case m == nil:
+			case msg.String() == "m":
+				return l, openModal(newMutePicker(l.ctx, *m))
+			default:
 				return l, cmdUnmute(l.ctx.api, m.ID, l.muted[m.ID])
 			}
 		case "o":
@@ -580,10 +588,16 @@ func (v *monitorView) Update(msg tea.Msg) (screen, tea.Cmd) {
 		case "o":
 			return v, openURL(v.ctx.api.BrowseURL(fmt.Sprintf("/monitors/%d", v.id)))
 		case "m":
+			if v.ctx.readOnly {
+				return v, readOnlyToast()
+			}
 			if v.mon != nil {
 				return v, openModal(newMutePicker(v.ctx, *v.mon))
 			}
 		case "u":
+			if v.ctx.readOnly {
+				return v, readOnlyToast()
+			}
 			return v, cmdUnmute(v.ctx.api, v.id, v.muted)
 		case "C":
 			if v.mon != nil {
