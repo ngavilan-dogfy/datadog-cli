@@ -9,21 +9,30 @@ import (
 
 var sparkLevels = []rune("▁▂▃▄▅▆▇█")
 
-// Sparkline squeezes values into one row of width cells (eighth blocks).
-// Gaps (NaN) stay blank.
+// Sparkline fits values into one row of width cells (eighth blocks):
+// several values share a cell, or one value spans several. Gaps (NaN) stay
+// blank.
 func Sparkline(values []float64, width int, color lipgloss.TerminalColor) string {
 	if width <= 0 {
 		return ""
 	}
 	cols := make([]float64, width)
 	cnt := make([]int, width)
-	for i, v := range values {
-		if math.IsNaN(v) {
-			continue
+	if len(values) > 0 && len(values) < width {
+		for x := range cols {
+			if v := values[x*len(values)/width]; !math.IsNaN(v) {
+				cols[x], cnt[x] = v, 1
+			}
 		}
-		x := i * width / max(1, len(values))
-		cols[x] += v
-		cnt[x]++
+	} else {
+		for i, v := range values {
+			if math.IsNaN(v) {
+				continue
+			}
+			x := i * width / max(1, len(values))
+			cols[x] += v
+			cnt[x]++
+		}
 	}
 	lo, hi := math.Inf(1), math.Inf(-1)
 	for i := range cols {

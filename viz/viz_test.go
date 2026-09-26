@@ -167,3 +167,14 @@ func TestMarkersFarFromDataDontSquashIt(t *testing.T) {
 		t.Errorf("FitMarkers: axis tops at %v, want ≥ 1.5", l.hi)
 	}
 }
+
+func TestSparklineStretchesFewPoints(t *testing.T) {
+	s := ansi.Strip(Sparkline([]float64{1, 2, 3}, 12, nil))
+	if strings.Contains(s, " ") || len([]rune(s)) != 12 {
+		t.Fatalf("3 points over 12 cells should fill them all: %q", s)
+	}
+	gap := ansi.Strip(Sparkline([]float64{1, math.NaN(), 3}, 9, nil))
+	if !strings.Contains(gap, "   ") {
+		t.Fatalf("a missing point should stay a gap: %q", gap)
+	}
+}
