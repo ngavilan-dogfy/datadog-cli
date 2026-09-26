@@ -4,13 +4,19 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ngavilan-dogfy/datadog-cli/internal/demo"
 	"github.com/ngavilan-dogfy/datadog-cli/internal/selfupdate"
 	"github.com/ngavilan-dogfy/datadog-cli/tui"
 
 	"github.com/spf13/cobra"
 )
 
-var uiTab string
+var (
+	uiTab  string
+	uiDemo bool
+)
+
+var _ tui.API = (*demo.API)(nil)
 
 var uiCmd = &cobra.Command{
 	Use:   "ui [dashboard-id | dashboard link]",
@@ -35,9 +41,17 @@ Examples:
   datadog ui                           # start on the Now tab
   datadog ui abc-def-ghi               # open a dashboard right away
   datadog ui https://app.datadoghq.eu/dashboard/abc-def-ghi/on-call
-  datadog ui --tab monitors`,
+  datadog ui --tab monitors
+  datadog ui --demo                    # try it with a made-up org, no keys needed`,
 	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
+		if uiDemo {
+			opts := tui.Options{Site: "demo · acme shop", Profile: "demo", Tab: strings.ToLower(uiTab), Demo: true}
+			if len(args) == 1 {
+				opts.Dashboard = dashboardID(args[0])
+			}
+			return tui.Run(tui.New(demo.New(), opts))
+		}
 		if client == nil || cfg == nil {
 			return fmt.Errorf("not connected — run 'datadog setup' to get started")
 		}
@@ -63,5 +77,6 @@ func dashboardID(s string) string {
 
 func init() {
 	uiCmd.Flags().StringVar(&uiTab, "tab", "", "Tab to start on: now, dashboards, monitors, logs, metrics")
+	uiCmd.Flags().BoolVar(&uiDemo, "demo", false, "Explore a made-up Datadog org (no keys needed, nothing leaves your machine)")
 	rootCmd.AddCommand(uiCmd)
 }

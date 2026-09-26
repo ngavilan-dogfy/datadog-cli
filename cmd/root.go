@@ -128,6 +128,9 @@ func needsAuth(cmd *cobra.Command) bool {
 	if !cmd.HasParent() {
 		return false // bare 'datadog' shows help or the welcome
 	}
+	if cmd == uiCmd && uiDemo {
+		return false
+	}
 	path := cmd.CommandPath()
 	for _, prefix := range []string{
 		"datadog setup", "datadog logout", "datadog doctor", "datadog version", "datadog update",

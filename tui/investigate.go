@@ -49,6 +49,9 @@ func (inv investigation) prompt() string {
 
 func cmdInvestigate(ctx *appCtx, inv investigation) tea.Cmd {
 	return func() tea.Msg {
+		if ctx.demo {
+			return toastMsg{text: "With your own Datadog, C hands this to Claude Code", kind: toastInfo}
+		}
 		if _, err := lookPath("claude"); err != nil {
 			return toastMsg{text: "Claude Code isn't installed — https://claude.com/claude-code", kind: toastErr}
 		}

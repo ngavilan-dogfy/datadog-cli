@@ -292,11 +292,20 @@ type harness struct {
 
 func newHarness(t *testing.T, width, height int) *harness {
 	t.Helper()
+	dd := newFakeDD()
+	h := newHarnessWith(t, dd, Options{Site: "datadoghq.eu", Profile: "test"}, width, height)
+	h.dd = dd
+	return h
+}
+
+// newHarnessWith runs the UI against any API (the demo org, say).
+func newHarnessWith(t *testing.T, api API, opts Options, width, height int) *harness {
+	t.Helper()
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("NO_COLOR", "1")
 	t.Setenv("TERM_PROGRAM", "")
 	t.Setenv("DATADOG_CHARTS", "")
-	h := &harness{t: t, dd: newFakeDD(), w: width, h: height}
+	h := &harness{t: t, w: width, h: height}
 	origTick, origSpin, origOpen, origClip, origLook := tickFn, spinFn, openURL, writeClipboard, lookPath
 	// Debounces fire at once; periodic refreshes and the spinner don't run.
 	tickFn = func(d time.Duration, fn func(time.Time) tea.Msg) tea.Cmd {
@@ -312,7 +321,7 @@ func newHarness(t *testing.T, width, height int) *harness {
 	t.Cleanup(func() {
 		tickFn, spinFn, openURL, writeClipboard, lookPath = origTick, origSpin, origOpen, origClip, origLook
 	})
-	h.app = New(h.dd, Options{Site: "datadoghq.eu", Profile: "test"})
+	h.app = New(api, opts)
 	h.run(h.app.Init())
 	h.dispatch(tea.WindowSizeMsg{Width: width, Height: height})
 	return h

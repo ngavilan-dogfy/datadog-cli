@@ -43,6 +43,7 @@ type appCtx struct {
 	update  string // newer release available, if any
 	repos   string // folder with git checkouts (for investigations)
 	profile string
+	demo    bool // made-up data: no links, no hand-offs
 
 	// shared lists, for the command palette
 	dashboards []datadog.DashboardSummary
@@ -56,6 +57,7 @@ type Options struct {
 	Dashboard   string // open this dashboard (id) right away
 	Tab         string // now, dashboards, monitors, logs, metrics
 	UpdateNotes string // newer release available
+	Demo        bool   // the API is the demo org (datadog ui --demo)
 }
 
 type tab struct {
@@ -123,6 +125,9 @@ var (
 // openURL opens a page in the browser; swappable in tests.
 var openURL = func(u string) tea.Cmd {
 	return func() tea.Msg {
+		if u == "" {
+			return toastMsg{text: "Demo data: there's nothing to open in Datadog", kind: toastInfo}
+		}
 		var err error
 		switch runtime.GOOS {
 		case "darwin":
@@ -142,7 +147,7 @@ var openURL = func(u string) tea.Cmd {
 // New builds the UI. Call Run to start it.
 func New(api API, opts Options) *Model {
 	ctx := &appCtx{api: api, site: opts.Site, profile: opts.Profile, tr: timeRange{span: time.Hour},
-		style: uiprefs.VizStyle(), update: opts.UpdateNotes}
+		style: uiprefs.VizStyle(), update: opts.UpdateNotes, demo: opts.Demo}
 	m := &Model{ctx: ctx, opts: opts}
 	m.tabs = []*tab{
 		{name: "Now", stack: []screen{newHome(ctx)}},
@@ -364,6 +369,9 @@ func (m *Model) View() string {
 
 func (m *Model) header() string {
 	left := " " + pill("datadog", th.accent)
+	if m.ctx.demo {
+		left += " " + pill("DEMO", th.yellow)
+	}
 	for i, t := range m.tabs {
 		label := string(rune('1'+i)) + " " + t.name
 		if i == m.active {
