@@ -52,6 +52,24 @@ func Format(v float64, u Unit) string {
 	return s
 }
 
+// FormatText is Format for sentences, with room to breathe: "11k req",
+// not the chart's "11kreq".
+func FormatText(v float64, u Unit) string {
+	switch u.Family {
+	case "time", "bytes", "bits", "percentage":
+		return Format(v, u)
+	}
+	s := Format(v, Unit{})
+	switch {
+	case s == "–":
+	case u.Short != "":
+		s += " " + u.Short
+	case u.Name != "":
+		s += " " + u.Name
+	}
+	return s
+}
+
 func scaleOr1(s float64) float64 {
 	if s == 0 {
 		return 1

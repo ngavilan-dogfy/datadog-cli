@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"time"
@@ -130,12 +131,25 @@ Examples:
 		}
 
 		if metricsJSON {
+			if len(result.Series) == 0 {
+				if hint := noDataHint(query); hint != "" {
+					fmt.Fprintln(os.Stderr, "no data: "+strings.ReplaceAll(hint, "\n", "; "))
+				}
+			}
 			return printJSON(result)
 		}
 
 		if len(result.Series) == 0 {
+			hint := noDataHint(query)
 			if isTTY() && !metricsPlain {
 				fmt.Println(ui.Dimmed.Render("  No data for this query."))
+				for _, h := range strings.Split(hint, "\n") {
+					if h != "" {
+						fmt.Println("  → " + h)
+					}
+				}
+			} else if hint != "" {
+				fmt.Fprintln(os.Stderr, "no data: "+strings.ReplaceAll(hint, "\n", "; "))
 			}
 			return nil
 		}
@@ -236,6 +250,10 @@ func printMetricsTSV(series []datadog.MetricsSeries) error {
 		for _, pt := range s.Pointlist {
 			if len(pt) >= 2 {
 				ts := time.Unix(int64(pt[0])/1000, 0).Format("2006-01-02 15:04:05")
+				if math.IsNaN(pt[1]) {
+					fmt.Printf("%s\t\n", ts) // no data
+					continue
+				}
 				fmt.Printf("%s\t%.4f\n", ts, pt[1])
 			}
 		}

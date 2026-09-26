@@ -1,7 +1,9 @@
 package datadog
 
 import (
+	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 )
 
@@ -338,7 +340,7 @@ type MetricsQueryResponse struct {
 
 type MetricsSeries struct {
 	Metric      string        `json:"metric"`
-	Pointlist   [][]float64   `json:"pointlist"`
+	Pointlist   PointList     `json:"pointlist"`
 	Scope       string        `json:"scope"`
 	Expression  string        `json:"expression"`
 	DisplayName string        `json:"display_name"`
@@ -347,6 +349,44 @@ type MetricsSeries struct {
 	End         int64         `json:"end"`
 	Interval    int           `json:"interval"`
 	Length      int           `json:"length"`
+}
+
+// PointList is [time, value] pairs; a missing value (null) is NaN.
+type PointList [][]float64
+
+func (p *PointList) UnmarshalJSON(b []byte) error {
+	var raw [][]*float64
+	if err := json.Unmarshal(b, &raw); err != nil {
+		return err
+	}
+	out := make(PointList, 0, len(raw))
+	for _, pt := range raw {
+		row := make([]float64, len(pt))
+		for i, v := range pt {
+			if v == nil {
+				row[i] = math.NaN()
+			} else {
+				row[i] = *v
+			}
+		}
+		out = append(out, row)
+	}
+	*p = out
+	return nil
+}
+
+func (p PointList) MarshalJSON() ([]byte, error) {
+	raw := make([][]*float64, len(p))
+	for i, pt := range p {
+		raw[i] = make([]*float64, len(pt))
+		for j := range pt {
+			if !math.IsNaN(pt[j]) && !math.IsInf(pt[j], 0) {
+				v := pt[j]
+				raw[i][j] = &v
+			}
+		}
+	}
+	return json.Marshal(raw)
 }
 
 type MetricsUnit struct {

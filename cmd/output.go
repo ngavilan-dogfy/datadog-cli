@@ -46,3 +46,11 @@ func truncRunes(s string, n int) string {
 	}
 	return string(r[:n-1]) + "…"
 }
+
+// termWidth is the terminal's width in columns, or def when there's none.
+func termWidth(def int) int {
+	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 20 {
+		return w
+	}
+	return def
+}
