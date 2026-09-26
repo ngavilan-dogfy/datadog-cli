@@ -19,6 +19,7 @@ import (
 // API implements the calls 'datadog ui' makes, from generated data.
 type API struct {
 	start time.Time
+	clock func() time.Time // nil: the wall clock
 
 	mu        sync.Mutex
 	downtimes map[string]datadog.DowntimeData
@@ -35,7 +36,13 @@ func New() *API {
 	return a
 }
 
-func (a *API) now() time.Time { return time.Now() }
+// now is the demo's clock; tests freeze it so repeated calls agree.
+func (a *API) now() time.Time {
+	if a.clock != nil {
+		return a.clock()
+	}
+	return time.Now()
+}
 
 // ─── dashboards ──────────────────────────────────────────────────
 

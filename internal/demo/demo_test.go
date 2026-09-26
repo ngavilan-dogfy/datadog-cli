@@ -164,6 +164,8 @@ func TestFormulasAndGroups(t *testing.T) {
 
 func TestLogsSearchAndPages(t *testing.T) {
 	a := New()
+	frozen := time.Now()
+	a.clock = func() time.Time { return frozen } // "now" mustn't move between searches
 	page, err := a.SearchLogsCursor("service:checkout status:error", "now-1h", "now", 20, "")
 	if err != nil {
 		t.Fatal(err)
