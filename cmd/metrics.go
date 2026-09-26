@@ -20,6 +20,9 @@ var (
 	metricsJSON    bool
 	metricsPlain   bool
 	metricsMinutes int
+	metricsSince   string
+	metricsFrom    string
+	metricsTo      string
 	metricsChart   bool
 )
 
@@ -81,16 +84,45 @@ var metricsQueryCmd = &cobra.Command{
 
 The query uses Datadog's metrics query syntax.
 
+The window is the last hour unless you say otherwise: --since 4h, or
+--from/--to with RFC3339 or epoch timestamps (--to defaults to now).
+
 Examples:
   datadog metrics query "avg:system.cpu.user{*}"
-  datadog metrics query "avg:system.cpu.user{host:web-01}" --minutes 60
-  datadog metrics query "sum:http.requests{service:api}.as_count()" --json`,
+  datadog metrics query "avg:system.cpu.user{host:web-01} by {host}" --since 4h
+  datadog metrics query "sum:http.requests{service:api}.as_count()" --json
+  datadog metrics query "p95:trace.http.request.duration{service:api}" --from 2026-05-19T04:30:00Z --to 2026-05-19T05:30:00Z`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		query := args[0]
 
-		to := time.Now().Unix()
-		from := to - int64(metricsMinutes*60)
+		toT := time.Now()
+		if metricsTo != "" {
+			t, err := parseDate(metricsTo)
+			if err != nil {
+				return fmt.Errorf("--to: %w", err)
+			}
+			toT = t
+		}
+		fromT := toT.Add(-time.Duration(metricsMinutes) * time.Minute)
+		switch {
+		case metricsFrom != "":
+			f, err := parseDate(metricsFrom)
+			if err != nil {
+				return fmt.Errorf("--from: %w", err)
+			}
+			fromT = f
+		case metricsSince != "":
+			d, err := parseDuration(metricsSince)
+			if err != nil {
+				return fmt.Errorf("--since: %w", err)
+			}
+			fromT = toT.Add(-d)
+		}
+		if !fromT.Before(toT) {
+			return fmt.Errorf("the window is empty: --from must be before --to")
+		}
+		from, to := fromT.Unix(), toT.Unix()
 
 		result, err := client.QueryMetrics(query, from, to)
 		if err != nil {
@@ -217,7 +249,10 @@ func init() {
 
 	metricsQueryCmd.Flags().BoolVar(&metricsJSON, "json", false, "Output as JSON")
 	metricsQueryCmd.Flags().BoolVar(&metricsPlain, "plain", false, "Force plain TSV output")
-	metricsQueryCmd.Flags().IntVar(&metricsMinutes, "minutes", 60, "Minutes of history to query (default 60)")
+	metricsQueryCmd.Flags().IntVar(&metricsMinutes, "minutes", 60, "Minutes of history to query")
+	metricsQueryCmd.Flags().StringVar(&metricsSince, "since", "", "Lookback window as duration (30m, 4h, 2d) — overrides --minutes")
+	metricsQueryCmd.Flags().StringVar(&metricsFrom, "from", "", "Start time (RFC3339 or epoch)")
+	metricsQueryCmd.Flags().StringVar(&metricsTo, "to", "", "End time (RFC3339 or epoch; default now)")
 	metricsQueryCmd.Flags().BoolVar(&metricsChart, "chart", true, "Draw a chart above the table (terminal only)")
 
 	metricsCmd.AddCommand(metricsSearchCmd)
