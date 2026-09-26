@@ -1,6 +1,9 @@
 package datadog
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 // --- APM spans (v2) ---
 
@@ -158,6 +161,13 @@ type LogsAggregateCompute struct {
 	Aggregation string `json:"aggregation"`
 	Type        string `json:"type"`
 	Metric      string `json:"metric,omitempty"`
+	Interval    string `json:"interval,omitempty"` // for type "timeseries": 1m, 5m, 1h…
+}
+
+// LogsCountPoint is one bucket of a logs count timeseries.
+type LogsCountPoint struct {
+	Time  time.Time `json:"time"`
+	Value float64   `json:"value"`
 }
 
 type LogsAggregateGroupBy struct {
