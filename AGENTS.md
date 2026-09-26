@@ -52,10 +52,10 @@ rarely a coincidence.
 
 ```sh
 datadog read "<any Datadog link>"
-datadog metrics describe "p95:trace.http.request{service:api}" --since 6h --compare 1d
-#   service:api: ~120ms; rose to ~480ms at 09:38 (×4); peak 1.2s at 09:52; last 450ms · vs 1d before: ×3.1
-datadog logs patterns "service:api status:error" --since 1h --compare 1d
-#   4,321  35.0%  new  api  error  09:58  TimeoutError: payments.authorize timed out after <num>ms
+datadog metrics describe "p95:trace.http.request{service:api}" --compare 1d
+#   service:api: ~120ms; rose to ~480ms at 09:38 (×4); last 450ms · vs 1d before: ×3.1
+datadog logs patterns "service:api status:error" --compare 1d
+#   4,321  35.0%  new  api  error  09:58  authorize timed out after <num>ms
 datadog trace <trace_id>                                # span tree, critical path, own time, N+1, errors, logs
 datadog dashboards read <id | link | --file x.json>     # every widget described, and its problems
 datadog monitors explain <id>                           # thresholds, who it wakes, what its data did

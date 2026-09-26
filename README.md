@@ -105,27 +105,27 @@ Charts are drawn with braille dots, which are finer, or with blocks, which work 
 An agent can't look at a chart, and raw time series or log dumps are large, noisy and easy to misread. These commands do the reading and return facts that can be quoted, at a fraction of the size. Each one takes `--md` (for a prompt) and `--json` (with the numbers).
 
 ```console
-$ datadog metrics describe "p95:trace.http.request{service:checkout}" --since 6h --compare 1d
-p95:trace.http.request{service:checkout} · May 19 04:00 → 10:00 CEST
-  service:checkout: ~120ms; rose to ~480ms at 09:38 (×4); peak 1.2s at 09:52; last 450ms · vs 1d before: ×3.1
+$ datadog metrics describe "p95:trace.http.request{service:checkout}" --compare 1d
+p95:trace.http.request{service:checkout} · May 19 06:00 → 10:00 CEST
+  service:checkout: ~120ms; rose to ~480ms at 09:38 (×4); last 450ms · vs 1d before: ×3.1
 
-$ datadog logs patterns "service:checkout status:error" --since 1h --compare 1d
+$ datadog logs patterns "service:checkout status:error" --compare 1d
     ≈COUNT   SHARE  VS 1D   SERVICE   LEVEL  LAST    PATTERN
-     4,321   35.0%  new     checkout  error  09:58   TimeoutError: payments.authorize timed out after <num>ms
-       912    7.4%  ×1.1    checkout  error  09:57   Payment declined for customer <*>: card expired
+     4,321   35.0%  new     checkout  error  09:58   authorize timed out after <num>ms
+       912    7.4%  ×1.1    checkout  error  09:57   card declined for customer <*>
 ```
 
-| Command | What it answers |
+| `datadog …` | What it answers |
 |---|---|
-| `datadog read <link>` | What does this link show? Dashboards, monitors, traces, log and trace searches, APM services, metrics, incidents and SLOs, read with the link's time window and template variables. |
-| `datadog trace <id>` | Where did this request spend its time, and what failed? The span tree as a waterfall, the critical path, each span's own time, repeated calls (N+1), the deepest error and the logs written during the request. |
-| `datadog metrics describe "<query>"` | What did this metric do? Its usual level, when it changed and by how much, peaks, gaps and where it ends — optionally against the same window a day or a week earlier. Counts treat missing intervals as zero. |
-| `datadog logs patterns "<query>"` | What is being logged? Messages folded into templates, with estimated counts, first and last seen, and a real example. `--compare 1d` marks the patterns that are new. |
-| `datadog dashboards read <id>` | What does this dashboard say, and what's wrong with it? Every widget described, plus failing queries, widgets without data (with the likely reason), charts that are always zero or unreadable, duplicates and filters that should be template variables. |
-| `datadog monitors explain <id>` | Why did this fire, or would it have? The monitor's data rolled up the way the monitor evaluates it, compared against its thresholds, with who it notifies and which groups aren't OK. |
-| `datadog coverage` | What isn't watched? Every service with traffic or error logs against the monitors, SLOs and owners that cover it, and the monitor that would close each gap, built from the service's own metrics. |
-| `datadog metrics tags <metric>` | What can I filter and group by? The tag values that actually exist, and how many series the metric has. |
-| `datadog api <path>` | Anything else: any API endpoint with your profile's keys, in the style of `gh api`. |
+| `read <link>` | What does this link show? Dashboards, monitors, traces, log and trace searches, APM services, metrics, incidents and SLOs, read with the link's time window and template variables. |
+| `trace <id>` | Where did this request spend its time, and what failed? The span tree as a waterfall, the critical path, each span's own time, repeated calls (N+1), the deepest error and the logs written during the request. |
+| `metrics describe <query>` | What did this metric do? Its usual level, when it changed and by how much, peaks, gaps and where it ends — optionally against the same window a day or a week earlier. Counts treat missing intervals as zero. |
+| `logs patterns <query>` | What is being logged? Messages folded into templates, with estimated counts, first and last seen, and a real example. `--compare 1d` marks the patterns that are new. |
+| `dashboards read <id>` | What does this dashboard say, and what's wrong with it? Every widget described, plus failing queries, widgets without data (with the likely reason), charts that are always zero or unreadable, duplicates and filters that should be template variables. |
+| `monitors explain <id>` | Why did this fire, or would it have? The monitor's data rolled up the way the monitor evaluates it, compared against its thresholds, with who it notifies and which groups aren't OK. |
+| `coverage` | What isn't watched? Every service with traffic or error logs against the monitors, SLOs and owners that cover it, and the monitor that would close each gap, built from the service's own metrics. |
+| `metrics tags <metric>` | What can I filter and group by? The tag values that actually exist, and how many series the metric has. |
+| `api <path>` | Anything else: any API endpoint with your profile's keys, in the style of `gh api`. |
 
 An empty metric query explains itself when it can: *env:prod isn't a value of env for trace.http.request (it has: production)*.
 
