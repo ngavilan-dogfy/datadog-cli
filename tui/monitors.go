@@ -243,19 +243,7 @@ func (l *monitorList) rebuild() {
 	l.rows = l.rows[:0]
 	for _, g := range names {
 		ms := groups[g]
-		sort.SliceStable(ms, func(i, j int) bool {
-			pi, pj := 9, 9
-			if ms[i].Priority != nil && *ms[i].Priority > 0 {
-				pi = *ms[i].Priority
-			}
-			if ms[j].Priority != nil && *ms[j].Priority > 0 {
-				pj = *ms[j].Priority
-			}
-			if pi != pj {
-				return pi < pj
-			}
-			return ms[i].Name < ms[j].Name
-		})
+		sort.SliceStable(ms, func(i, j int) bool { return byPriority(*ms[i], *ms[j]) })
 		l.rows = append(l.rows, monRow{group: g, count: len(ms)})
 		if l.folded[g] && len(terms) == 0 {
 			continue
@@ -764,4 +752,19 @@ func (v *monitorView) groupLines(width int) []string {
 
 func (v *monitorView) Hints() []hint {
 	return []hint{{"m", "mute"}, {"u", "unmute"}, {"C", "investigate"}, {"o", "browser"}, {"r", "refresh"}, {"esc", "back"}}
+}
+
+// byPriority orders monitors P1 first (no priority last), then by name.
+func byPriority(a, b datadog.Monitor) bool {
+	pa, pb := 9, 9
+	if a.Priority != nil && *a.Priority > 0 {
+		pa = *a.Priority
+	}
+	if b.Priority != nil && *b.Priority > 0 {
+		pb = *b.Priority
+	}
+	if pa != pb {
+		return pa < pb
+	}
+	return a.Name < b.Name
 }

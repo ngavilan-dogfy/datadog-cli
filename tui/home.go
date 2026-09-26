@@ -108,7 +108,7 @@ func (h *home) attention() []datadog.Monitor {
 		if stateRank(out[i].OverallState) != stateRank(out[j].OverallState) {
 			return stateRank(out[i].OverallState) < stateRank(out[j].OverallState)
 		}
-		return out[i].Name < out[j].Name
+		return byPriority(out[i], out[j])
 	})
 	return out
 }
