@@ -25,71 +25,40 @@ var rootCmd = &cobra.Command{
 	Short: "Fast CLI for Datadog monitoring and observability",
 	// Runtime errors (API failures, bad ids…) shouldn't dump the usage text.
 	SilenceUsage: true,
-	Long: `A fast command-line tool for Datadog. Fully scriptable and pipe-friendly.
+	Long: `Datadog from your terminal: a fast UI for people, and commands that speak
+JSON for scripts and AI agents.
 
-All commands auto-detect TTY:
-  • Terminal  → colored, human-friendly output
-  • Piped     → machine-readable TSV or plain text
-  • --json    → structured JSON (on most commands)
+Get started:
+  datadog setup                     Connect to your Datadog, step by step
+  datadog ui                        Dashboards, monitors, logs and metrics
+  datadog ui --demo                 Look around a made-up org first (no keys)
 
-Monitors:
-  datadog monitors                List monitors with status
-  datadog monitors show 12345     Full monitor details
-  datadog monitors mute 12345     Mute a monitor
-  datadog monitors unmute 12345   Unmute a monitor
-  datadog monitors search "cpu"   Search monitors by name
+What's going on?
+  datadog triage                    Alerts, incidents, errors and changes, in one call
+  datadog services context api      One service: monitors, SLOs, errors, deploys
+  datadog last                      What just fired, what was just deployed
+  datadog correlate --around <time> Every signal around a moment
 
-Dashboards:
-  datadog dashboards              List all dashboards
-  datadog dashboards open abc-123 Open dashboard in browser
+Look things up:
+  datadog monitors                  Monitors and their state (show, search)
+  datadog logs "service:api status:error" --since 2h
+  datadog metrics query "avg:system.cpu.user{*} by {host}"
+  datadog dashboards · incidents · slos · hosts · events · audit · traces · rum
 
-Hosts:
-  datadog hosts                   List infrastructure hosts
-  datadog hosts mute web-01       Mute a host
-  datadog hosts unmute web-01     Unmute a host
+Change things (ask first when an agent does it):
+  datadog monitors mute 12345 -d 1h
+  datadog downtimes schedule · incidents create · events post · dashboards create
 
-Events:
-  datadog events                  Recent events (last 24h)
-  datadog events post "Deploy"    Post an event
+Every command adapts to where its output goes: colors in a terminal, TSV
+when piped, --json on most commands. 'datadog schema' lists them all as JSON.
 
-Logs:
-  datadog logs "service:api"      Search logs
+Keep it working:
+  datadog doctor                    Check config, keys and access, with fixes
+  datadog update                    Update to the latest release
+  datadog skill install             Teach Claude Code this CLI (/datadog)
 
-Downtimes:
-  datadog downtimes               List scheduled downtimes
-  datadog downtimes schedule      Create a downtime
-  datadog downtimes cancel <id>   Cancel a downtime
-
-Incidents:
-  datadog incidents               List incidents
-  datadog incidents show <id>     Incident details
-
-SLOs:
-  datadog slos                    List SLOs
-  datadog slos show <id>          SLO details
-
-Metrics:
-  datadog metrics search "cpu"    Search metric names
-  datadog metrics query "avg:system.cpu.user{*}"  Query timeseries
-
-Interactive:
-  datadog ui                      Dashboards, monitors, logs and metrics in the terminal
-
-Other:
-  datadog open /monitors          Open any DD page in browser
-  datadog whoami                  Validate credentials + show org
-  datadog config set/get/ls       Profile settings
-  datadog profile create/ls/use/delete/show
-
-Setup:
-  datadog setup                   Connect to your Datadog, step by step
-  datadog doctor                  Check that everything works (with fixes)
-  datadog update                  Update to the latest version
-  datadog skill install           Teach Claude Code to use this CLI (/datadog)
-  datadog logout                  Remove the keys from a profile
-
-Environment variables DD_API_KEY, DD_APP_KEY, DD_SITE override profile settings
-(and are enough on their own: no setup needed in CI or containers).`,
+DD_API_KEY, DD_APP_KEY and DD_SITE override the profile, and are enough on
+their own: no setup needed in CI or containers.`,
 	// Bare 'datadog': help, or a welcome that offers setup on a fresh install.
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if cfg != nil && cfg.IsAuthenticated() {
