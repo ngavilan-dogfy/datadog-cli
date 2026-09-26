@@ -33,19 +33,24 @@ type SpanData struct {
 
 type SpanAttributes struct {
 	// Top-level fields per the v2 /spans/events/search response.
-	StartTimestamp string                 `json:"start_timestamp"`
-	EndTimestamp   string                 `json:"end_timestamp"`
-	Service        string                 `json:"service"`
-	ResourceName   string                 `json:"resource_name"`
-	OperationName  string                 `json:"operation_name"`
-	Env            string                 `json:"env"`
-	Host           string                 `json:"host"`
-	SpanID         string                 `json:"span_id"`
-	ParentID       string                 `json:"parent_id"`
-	Status         string                 `json:"status"`
-	Type           string                 `json:"type"`
-	Tags           []string               `json:"tags"`
-	Custom         map[string]interface{} `json:"custom"`
+	StartTimestamp string `json:"start_timestamp"`
+	EndTimestamp   string `json:"end_timestamp"`
+	Service        string `json:"service"`
+	ResourceName   string `json:"resource_name"`
+	OperationName  string `json:"operation_name"`
+	Env            string `json:"env"`
+	Host           string `json:"host"`
+	SpanID         string `json:"span_id"`
+	ParentID       string `json:"parent_id"`
+	TraceIDHex     string `json:"trace_id"` // 128-bit hex
+	Status         string `json:"status"`
+	// Why the span was kept: ingestion_reason (rule, error, auto…) and
+	// retained_by (retention_filter, flex_retention…).
+	IngestionReason string                 `json:"ingestion_reason"`
+	RetainedBy      string                 `json:"retained_by"`
+	Type            string                 `json:"type"`
+	Tags            []string               `json:"tags"`
+	Custom          map[string]interface{} `json:"custom"`
 }
 
 // Timestamp returns the best-effort start timestamp string.
@@ -73,6 +78,9 @@ func (a SpanAttributes) DurationNS() int64 {
 
 // TraceID extracts the trace ID from custom.trace_id when present.
 func (a SpanAttributes) TraceID() string {
+	if a.TraceIDHex != "" {
+		return a.TraceIDHex
+	}
 	if a.Custom == nil {
 		return ""
 	}

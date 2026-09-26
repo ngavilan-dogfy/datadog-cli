@@ -11,16 +11,26 @@ import (
 // which accepts a flat body. We wrap silently so callers don't need to care.
 
 func (c *Client) SearchSpans(query, from, to string, limit int) (*SpansResponse, error) {
+	return c.SearchSpansPage(query, from, to, limit, "-timestamp", "")
+}
+
+// SearchSpansPage is SearchSpans with a sort ("timestamp" or "-timestamp")
+// and a cursor: pass Meta.Page.After of the previous page to continue.
+func (c *Client) SearchSpansPage(query, from, to string, limit int, sort, cursor string) (*SpansResponse, error) {
 	if limit == 0 {
 		limit = 25
+	}
+	page := map[string]interface{}{"limit": limit}
+	if cursor != "" {
+		page["cursor"] = cursor
 	}
 	body := map[string]interface{}{
 		"data": map[string]interface{}{
 			"type": "search_request",
 			"attributes": map[string]interface{}{
 				"filter": map[string]interface{}{"from": from, "to": to, "query": query},
-				"sort":   "-timestamp",
-				"page":   map[string]interface{}{"limit": limit},
+				"sort":   sort,
+				"page":   page,
 			},
 		},
 	}
