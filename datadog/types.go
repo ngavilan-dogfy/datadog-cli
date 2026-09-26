@@ -350,8 +350,10 @@ type MetricsSeries struct {
 }
 
 type MetricsUnit struct {
-	Name   string `json:"name"`
-	Family string `json:"family"`
+	Name        string  `json:"name"`
+	Family      string  `json:"family"`
+	ShortName   string  `json:"short_name,omitempty"`
+	ScaleFactor float64 `json:"scale_factor,omitempty"`
 }
 
 // --- Time helpers ---

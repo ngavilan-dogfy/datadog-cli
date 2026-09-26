@@ -95,9 +95,13 @@ func (c *Client) do(method, path string, body interface{}) ([]byte, error) {
 			time.Sleep(backoff(attempt))
 			continue
 		case resp.StatusCode == 403:
-			return nil, fmt.Errorf("forbidden — check your API/App keys (run 'datadog login')")
+			msg := "forbidden (403) — your keys can't read this; 'datadog doctor' shows what they can access"
+			if detail := apiErrorMessage(respBody); detail != "" && detail != "Forbidden" && len(detail) < 300 {
+				msg += ": " + detail
+			}
+			return nil, fmt.Errorf("%s", msg)
 		case resp.StatusCode == 401:
-			return nil, fmt.Errorf("unauthorized — run 'datadog login' to set credentials")
+			return nil, fmt.Errorf("unauthorized (401) — the keys aren't valid; run 'datadog setup'")
 		case resp.StatusCode >= 400:
 			return nil, fmt.Errorf("API error %d: %s", resp.StatusCode, apiErrorMessage(respBody))
 		}
