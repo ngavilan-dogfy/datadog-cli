@@ -79,10 +79,15 @@ push origin v2.0.0` — and [Release](.github/workflows/release.yml) builds it
 the same way. `make release VERSION=v1.2.3` builds the release files into
 `dist/` locally, to look at before pushing.
 
-## README assets
+## Screenshots and images
 
 - Screenshots in `assets/` are taken from `datadog ui --demo`.
 - `assets/setup.gif` is recorded with `make e2e && scripts/record-setup.sh`
   (macOS, [vhs](https://github.com/charmbracelet/vhs)): made-up keys, a
   throwaway home directory, and the clipboard restored afterwards. Look at
   the result frame by frame before committing it.
+- `assets/social-preview.png` is the card GitHub shows when the repository is
+  shared (*Settings → General → Social preview*). It's rendered from
+  `scripts/record/social-preview.html` at 1280×640 — for example with
+  `chrome --headless=new --window-size=1280,640 --screenshot=assets/social-preview.png scripts/record/social-preview.html`
+  — whenever the tagline or the hero screenshot changes.
