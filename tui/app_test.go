@@ -206,3 +206,16 @@ func TestChartsFollowTheRealWidth(t *testing.T) {
 		t.Fatalf("the logs histogram uses %d ms buckets on a 140-column screen, want ≤ 1 min", logs)
 	}
 }
+
+// A dashboard opened from the command line loads before the size is known.
+func TestDashboardFromTheCommandLineUsesTheRealWidth(t *testing.T) {
+	dd := newFakeDD()
+	h := newHarnessWith(t, dd, Options{Site: "datadoghq.eu", Dashboard: "abc-123"}, 160, 48)
+	h.expect("Requests by host")
+	dd.mu.Lock()
+	iv := dd.intervals["sum:requests{env:prod} by {host}"]
+	dd.mu.Unlock()
+	if iv == 0 || iv > 120_000 {
+		t.Fatalf("a 9-column-wide time series on a 160-column screen asked for %d ms points", iv)
+	}
+}

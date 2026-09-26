@@ -48,8 +48,9 @@ type logsMsg struct {
 }
 
 type logsHistMsg struct {
-	gen int
-	d   *widgetData
+	gen  int
+	cols int
+	d    *widgetData
 }
 
 type logsLiveMsg struct {
@@ -103,7 +104,7 @@ func (v *logsView) histogram() tea.Cmd {
 			}},
 			"formulas": []any{map[string]any{"formula": "a"}},
 		}}}
-		return logsHistMsg{gen: gen, d: limited(func() *widgetData { return fetchTimeseries(api, def, nil, from, to, cols) })}
+		return logsHistMsg{gen: gen, cols: cols, d: limited(func() *widgetData { return fetchTimeseries(api, def, nil, from, to, cols) })}
 	}
 }
 
@@ -164,7 +165,7 @@ func (v *logsView) Update(msg tea.Msg) (screen, tea.Cmd) {
 		}
 		v.after = msg.after
 	case logsHistMsg:
-		if msg.gen == v.gen {
+		if msg.gen == v.gen && msg.cols == v.histCols { // only the latest ask
 			v.hist = msg.d
 			colorByStatus(v.hist)
 		}

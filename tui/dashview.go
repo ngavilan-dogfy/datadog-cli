@@ -205,6 +205,11 @@ func (v *dashView) Update(msg tea.Msg) (screen, tea.Cmd) {
 		if msg.d.key == v.rangeKey() {
 			v.data[msg.w] = msg.d
 			delete(v.cache, msg.w)
+			// Asked for before the terminal size was known: ask again.
+			if needsData(msg.w.Type) && tooCoarse(msg.d.cols, v.wantCols(msg.w)) {
+				v.loading[msg.w] = true
+				return v, v.fetch(msg.w, msg.d.key)
+			}
 		}
 	case dashTickMsg:
 		if msg.id != v.id {
