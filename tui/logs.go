@@ -551,11 +551,20 @@ func flattenAttrs(m map[string]any) [][2]string {
 			b, _ := json.Marshal(x)
 			out = append(out, [2]string{prefix, string(b)})
 		case float64:
-			if x == math.Trunc(x) && math.Abs(x) < 1e15 {
-				out = append(out, [2]string{prefix, strconv.FormatInt(int64(x), 10)})
-			} else {
-				out = append(out, [2]string{prefix, strconv.FormatFloat(x, 'g', -1, 64)})
+			var s string
+			switch {
+			case x == math.Trunc(x) && math.Abs(x) < 1e15:
+				s = strconv.FormatInt(int64(x), 10)
+			case math.Abs(x) >= 1e6 && math.Abs(x) < 1e15: // no 1.2e+09
+				s = strconv.FormatFloat(x, 'f', 0, 64)
+			default:
+				s = strconv.FormatFloat(x, 'g', -1, 64)
 			}
+			// Datadog's standard duration attribute is in nanoseconds.
+			if prefix == "duration" || strings.HasSuffix(prefix, ".duration") {
+				s += "  (" + viz.Format(x/1e9, viz.Unit{Family: "time"}) + ")"
+			}
+			out = append(out, [2]string{prefix, s})
 		case nil:
 			out = append(out, [2]string{prefix, "null"})
 		default:
