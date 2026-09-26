@@ -78,7 +78,7 @@ datadog incidents show <id> --json
 datadog correlate --around <spike-ts> --window 10m --json   # events/incidents/security near a timestamp
 datadog metrics meta system.cpu.user --json                 # unit/type before interpreting numbers
 datadog metrics query "avg:system.cpu.user{service:api}" --json
-datadog logs-aggregate "service:api" --group-by status --json
+datadog logs aggregate "service:api" --groupby status --json
 ```
 
 Audit query tips: `-@asset.type:datadog_agent_configuration` drops periodic
@@ -106,17 +106,27 @@ Everything else is read-only.
 
 ## Developing this repo
 
-- Go 1.25, Cobra for commands (`cmd/`), raw HTTP client in `datadog/`
-  (no official SDK), Bubbletea TUI in `tui/`, lipgloss styles in `ui/`.
-- One file per command area in `cmd/`; each file registers itself in `init()`
-  via `rootCmd.AddCommand`. Flags are package-level vars prefixed with the
-  command name.
+- Go 1.25. Commands in `cmd/` (Cobra, one file per area, each registers
+  itself in `init()`; flags are package-level vars prefixed with the command
+  name). `cmd/datadog/main.go` is the entry point.
+- `datadog/` is a hand-rolled HTTP client (no official SDK). Types in
+  `datadog/types*.go` model the *real* responses: check shapes against the
+  live API, the docs have drifted before.
+- `tui/` is `datadog ui` (Bubble Tea); `viz/` draws charts, sparklines and
+  big numbers; `internal/demo/` is the made-up org behind `ui --demo`;
+  `internal/selfupdate/` is `update` and the update notice (kept identical
+  across the ngavilan-dogfy CLIs); `internal/uiprefs/` remembers the chart
+  style.
 - Every list/show command implements the trio: TTY table, TSV (piped or
-  `--plain`), `--json`. Follow `cmd/logs.go` as the reference pattern.
-- API types live in `datadog/types*.go` and model real API responses —
-  verify shapes against the live API, not just the docs (metadata shapes
-  have diverged from docs before).
-- New commands that don't need credentials must be added to the `noAuth`
-  list in `cmd/root.go`.
-- Check: `make check` (vet + test + build). Smoke-test read-only commands
-  against the real API when credentials are configured.
+  `--plain`), `--json`. `cmd/logs.go` is the reference.
+- Commands that work without credentials go in the list in `needsAuth`
+  (`cmd/root.go`).
+- The UI is tested against a fake Datadog (`tui/fakedd_test.go`): the
+  harness types keys and checks that every frame is exactly the terminal's
+  size. `internal/demo` has its own test that every monitor's state matches
+  its data. Look at the real thing with `datadog ui --demo`.
+- `make check` (vet + test + build) before committing. Smoke-test read-only
+  commands against the real API when you have credentials; never run
+  mutating commands against a real org to test.
+- Commits follow Conventional Commits: they decide the next version and
+  become the release notes (see CONTRIBUTING.md).

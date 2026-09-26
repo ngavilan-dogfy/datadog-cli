@@ -1,93 +1,148 @@
-# datadog-cli
+<h1 align="center">datadog</h1>
 
-Fast, scriptable command-line tool for Datadog. Built in Go with Cobra + Bubbletea.
+<p align="center"><strong>Datadog in your terminal, for you and for your agents.</strong><br>
+Dashboards drawn the way Datadog draws them, monitors, logs and metrics in a fast terminal UI, and a CLI whose commands all speak JSON, so Claude Code (or any agent) can help you work through an incident.</p>
 
-```
-datadog triage                       # everything going on right now, one call
-datadog status                       # triggered monitors, open incidents, SLOs at risk
-datadog logs "service:api status:error" --since 2h
-datadog monitors --state Alert
-datadog correlate --around 2026-05-19T04:54:00Z --window 10m
-```
+<p align="center">
+  <a href="https://github.com/ngavilan-dogfy/datadog-cli/releases/latest"><img src="https://img.shields.io/github/v/release/ngavilan-dogfy/datadog-cli?style=flat-square&color=632ca6&label=release" alt="Release"></a>
+  <a href="https://github.com/ngavilan-dogfy/datadog-cli/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/ngavilan-dogfy/datadog-cli/ci.yml?style=flat-square&label=tests" alt="Tests"></a>
+  <img src="https://img.shields.io/badge/platform-macOS%20%7C%20Linux%20%7C%20Windows-lightgrey?style=flat-square" alt="Platform">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="License"></a>
+</p>
 
-## Install
+<p align="center">
+  <img src="assets/dashboard.png" alt="A Datadog dashboard drawn in the terminal: query values, time series, stacked error bars, a top list and a change widget" width="860">
+</p>
 
-```sh
-make install        # builds with version info and copies to /usr/local/bin
-# or
-go build -o datadog-cli .
-```
+## Get started in two minutes
 
-## Authentication
-
-```sh
-datadog login       # interactive: API key + App key + site
-datadog whoami      # validate credentials
+```bash
+curl -fsSL https://raw.githubusercontent.com/ngavilan-dogfy/datadog-cli/main/install.sh | sh
+datadog setup
+datadog ui
 ```
 
-Environment variables `DD_API_KEY`, `DD_APP_KEY` and `DD_SITE` override the
-active profile. Profiles live in `~/.config/datadog-cli/profiles/` and are
-managed with `datadog profile create/ls/use/delete/show`.
+No keys at hand? `datadog ui --demo` opens a made-up web store whose checkout is having a bad afternoon, so you can look around first. Nothing leaves your machine.
 
-## Output conventions
+`datadog setup` asks for three things and checks each one against Datadog before going on:
 
-Every read command adapts to its consumer:
+1. **Site**: pick yours from the list, or paste any link from your Datadog (a dashboard, a monitor) and the site is taken from it.
+2. **API key**: *Organization Settings → API Keys*. A key that belongs to another site is caught, and setup tells you which site it is.
+3. **Application key**: *Organization Settings → Application Keys*. Setup says whose key it is and what it can read: monitors, dashboards, metrics, logs, incidents, SLOs.
 
-| Consumer            | Format                                        |
-|---------------------|-----------------------------------------------|
-| Terminal (TTY)      | colored, human-friendly tables                |
-| Piped               | tab-separated values (TSV), header row first  |
-| `--json`            | structured JSON                               |
-| `--plain`           | force TSV even on a TTY                       |
+Keys stay on your machine, in `~/.config/datadog-cli/profiles/` with owner-only permissions. `datadog doctor` checks everything again whenever something looks off, with a fix for each problem it finds.
 
-On failure with `--json`, a single parseable line `{"error":"..."}` is also
-written to stderr. Exit code is 0 on success, 1 on any error.
-`NO_COLOR` is honored for terminal output.
+In CI or containers there's nothing to set up: `DD_API_KEY`, `DD_APP_KEY` and `DD_SITE` are enough.
+
+## The terminal UI
+
+`datadog ui` has five tabs. Everything loads in parallel; Now, dashboards and monitors refresh every minute, and logs tail live with `L`.
+
+| | |
+|---|---|
+| **Now**: *is anything wrong right now?* What's alerting, incidents, SLOs at risk, which services are logging errors and what changed recently, with repeated events folded into one line. | <img src="assets/now.png" width="420"> |
+| **Dashboards**: your dashboards, laid out on Datadog's grid: time series, query values, top lists, change widgets, notes, groups, log streams and monitor summaries, with template variables (`v`) and one time range for everything (`t`). | <img src="assets/dashboard.png" width="420"> |
+| **Zoom**: `⏎` on a widget fills the screen. Move the cursor with `←` `→` to read exact values at any moment; the queries are listed below. | <img src="assets/zoom.png" width="420"> |
+| **Monitors**: grouped by state, P1 first. A monitor's detail charts what it watches against its thresholds, lists its groups and shows the message as it reads in the current state. `m` mutes for a while, `u` unmutes. | <img src="assets/monitor.png" width="420"> |
+| **Logs**: volume by status over time, the matching lines, and a detail view with every attribute and the stack trace. `L` tails live, `s` narrows to the log's service. | <img src="assets/logs.png" width="420"> |
+| **Metrics**: type a metric (`tab` completes), then change the space aggregation with `a` and the grouping with `b`. | <img src="assets/metrics.png" width="420"> |
+
+`:` or `Ctrl+K` jumps anywhere: a dashboard, a monitor, a tab. `o` opens what you're looking at in Datadog. On a monitor or a log, `C` hands it to Claude Code with the commands to dig further.
+
+**Charts** come in two styles: braille dots, which are finer, and blocks, which work with any font. `B` switches between them and the choice is remembered; `setup` shows you both so you can pick. If braille charts look faint or show boxes, your font has no braille: use blocks, or set `DATADOG_CHARTS=blocks`.
+
+<details>
+<summary><strong>Keyboard shortcuts</strong></summary>
+
+| Key | Where | Action |
+|---|---|---|
+| `1`–`5`, `Tab` | everywhere | Now · Dashboards · Monitors · Logs · Metrics |
+| `:` / `Ctrl+K` | everywhere | Jump to a dashboard, monitor or tab |
+| `t` | everywhere | Time range |
+| `B` | everywhere | Braille or block charts |
+| `?` | everywhere | Every key for the current screen |
+| `q` / `Esc` | everywhere | Back, or quit |
+| `h` `j` `k` `l` / arrows | dashboard | Move between widgets |
+| `⏎` | dashboard | Zoom a widget, fold a group |
+| `v` | dashboard | Template variables |
+| `c` / `+` `-` | dashboard | Fold every group / denser or roomier layout |
+| `←` `→`, `H` `L` | zoomed chart | Move the cursor, jump further |
+| `m` / `u` | monitors | Mute for a while / unmute |
+| `/` | lists, logs, metrics | Filter, or edit the query |
+| `L` / `s` / `n` | logs | Live tail / only this service / load more |
+| `a` / `b` | metrics | Space aggregation / group by |
+| `C` | monitor, log | Investigate with Claude Code |
+| `o` | anywhere | Open in Datadog |
+
+</details>
 
 ## For scripts and AI agents
 
-Two commands are designed specifically for automation:
+Every command adapts to where its output goes:
 
-- **`datadog schema [command] [--full]`** — dumps the whole command tree
-  (commands, flags, types, defaults, which support `--json`) as JSON.
-  One call to discover everything the CLI can do.
-- **`datadog triage [--since 1h] [--service X] [--env Y] --json`** — one-shot
-  context snapshot: alerting monitors (enriched with query + message), open
-  incidents, SLOs at risk, events, error logs, audit-trail config changes,
-  security signals, CI pipelines, active downtimes and host up/total counts,
-  fetched concurrently and returned as a single JSON document with a
-  `summary` block and per-section `errors`.
-- **`datadog services context <name> [--since 1h] --json`** — the one-call
-  dossier for a single service: catalog entry, monitors, SLOs, log volume by
-  status, error logs, APM error spans, events and downtimes.
+| Output goes to | Format |
+|---|---|
+| a terminal | colors, tables and charts |
+| a pipe | tab-separated values, header row first |
+| `--json` (most commands) | structured JSON on stdout, nothing else |
 
-See [AGENTS.md](AGENTS.md) for the full agent guide and recipes.
+With `--json`, a failure also writes one parseable line to stderr, `{"error":"..."}`, and exits with 1. `NO_COLOR` is honored.
 
-## Command overview
+Three commands exist mostly for automation:
 
-| Area        | Commands                                                        |
-|-------------|-----------------------------------------------------------------|
-| Snapshot    | `triage`, `status`, `last`, `correlate`, `watch`                |
-| Monitors    | `monitors [show/mute/unmute/search/create/update/delete]`, `batch mute/unmute` |
-| Logs        | `logs` (`--all`, `--jsonl`), `logs tail`, `logs-aggregate`      |
-| Metrics     | `metrics search/query/meta`, `tags`                             |
-| Dashboards  | `dashboards [show/open/create/update/delete/lint]`              |
-| Incidents   | `incidents [show/create/update]`                                |
-| SLOs        | `slos [show]`                                                   |
-| Traces/RUM  | `traces`, `rum`, `profile`                                      |
-| Infra       | `hosts [mute/unmute]`, `services [show/context]`, `integrations` |
-| CI/CD       | `pipelines`, `deploy`, `synthetics`                             |
-| Security    | `security`, `audit`                                             |
-| Other       | `events`, `downtimes`, `notebooks`, `usage`, `open`, `ui` (TUI) |
-| Meta        | `schema`, `whoami`, `login`, `logout`, `config`, `profile`, `completion` |
+- **`datadog triage --json`**: one call, the whole picture. Alerting monitors (with their query and message), open incidents, SLOs at risk, error logs, events, audit-trail changes, security signals, CI pipelines, active downtimes and hosts up, fetched concurrently. Narrow it with `--since 15m`, `--service api --env prod` or `--around <time>`. A `summary` block comes first, and sections that failed are listed under `errors` without spoiling the rest.
+- **`datadog services context <service> --json`**: everything about one service: catalog entry, monitors, SLOs, log volume by status, error logs, failing endpoints from APM, deploys and downtimes.
+- **`datadog schema`**: every command and flag as JSON, and which ones support `--json`.
 
-Run `datadog <command> --help` or `datadog schema <command> --full` for details.
+### Claude Code
 
-## Development
-
-```sh
-make build     # build with version ldflags
-make test      # go test ./...
-make vet       # go vet ./...
-make check     # vet + test + build
+```bash
+datadog skill install
 ```
+
+This installs the `/datadog` skill, so Claude Code knows how to investigate with this CLI: start from `triage`, go down to a service, then to its logs and metrics, and ask before changing anything. The skill ships inside the binary and is refreshed when you update. [AGENTS.md](AGENTS.md) has the full guide for agents.
+
+## Commands
+
+| Area | Commands |
+|---|---|
+| What's going on | `triage`, `status`, `last`, `correlate` |
+| Monitors | `monitors` (`show`, `search`, `mute`, `unmute`, `create`, `edit`, `delete`, `export`, `import`), `batch mute/unmute` |
+| Logs | `logs` (`--all`, `--jsonl`), `logs tail`, `logs aggregate` |
+| Metrics | `metrics search/query/meta`, `tags` |
+| Dashboards | `dashboards` (`get`, `open`, `create`, `clone`, `export`, `import`, `delete`, `lint`) |
+| Incidents and SLOs | `incidents` (`show`, `create`, `update`), `slos` |
+| Traces and RUM | `traces`, `rum` |
+| Infrastructure | `hosts` (`mute`, `unmute`), `services` (`show`, `context`), `integrations` |
+| CI/CD | `pipelines`, `deploy`, `synthetics` (`show`, `trigger`) |
+| Security | `security`, `audit` |
+| Other | `events` (`post`), `downtimes` (`schedule`, `cancel`), `notebooks`, `usage`, `open`, `ui` |
+| This CLI | `setup`, `doctor`, `update`, `version`, `skill`, `whoami`, `profile`, `config`, `logout`, `schema`, `completion` |
+
+`datadog <command> --help` explains each one, with examples.
+
+## Updating
+
+```bash
+datadog update
+```
+
+It shows what's new, downloads the release for your machine, checks its checksum and that the new binary runs, and only then replaces the old one. Your settings aren't touched. When a new version is out, commands you run in a terminal mention it after their output (the check runs in the background, at most once a day); `DATADOG_NO_UPDATE_NOTIFIER=1` turns that off.
+
+<details>
+<summary><strong>Other ways to install</strong></summary>
+
+- **A specific version or folder**: `curl -fsSL …/install.sh | DATADOG_VERSION=v1.2.0 DATADOG_INSTALL_DIR=/usr/local/bin sh`
+- **With Go**: `go install github.com/ngavilan-dogfy/datadog-cli/cmd/datadog@latest`
+- **By hand**: download `datadog-<os>-<arch>` from the [latest release](https://github.com/ngavilan-dogfy/datadog-cli/releases/latest), check it against `checksums.txt`, make it executable and put it in your `PATH`. Windows: `datadog-windows-amd64.exe`.
+- **From source**: `make install` builds and copies to `~/.local/bin`.
+
+</details>
+
+## Contributing
+
+`make check` runs vet, the tests and a build. Releases are cut automatically from [conventional commits](https://www.conventionalcommits.org) on `main`; [CONTRIBUTING.md](CONTRIBUTING.md) explains how.
+
+## License
+
+[MIT](LICENSE)
