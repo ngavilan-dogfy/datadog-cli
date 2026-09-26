@@ -1,6 +1,7 @@
-# Compiled binary
-/datadog-cli
+# Builds (make build, make release)
+/bin/
 /dist/
+/datadog-cli
 
 # Editor / OS
 .DS_Store
