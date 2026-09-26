@@ -21,6 +21,10 @@ type Profile struct {
 
 	// Settings
 	MaxResults int `yaml:"max_results,omitempty"`
+
+	// ReadOnly makes every command that would change Datadog refuse: for
+	// profiles that AI agents use. DATADOG_READ_ONLY=1 turns it on too.
+	ReadOnly bool `yaml:"read_only,omitempty"`
 }
 
 // Known Datadog sites with labels.
@@ -194,8 +198,23 @@ func LoadActive() (*Profile, error) {
 	if v := os.Getenv("DD_SITE"); v != "" {
 		p.Site = v
 	}
+	if envReadOnly() {
+		p.ReadOnly = true
+	}
 
 	return p, nil
+}
+
+// ReadOnlyFromEnv reports DATADOG_READ_ONLY=1 (or true/yes/on).
+func ReadOnlyFromEnv() bool { return envReadOnly() }
+
+// envReadOnly: DATADOG_READ_ONLY=1 (or true/yes) forces read-only.
+func envReadOnly() bool {
+	switch strings.ToLower(os.Getenv("DATADOG_READ_ONLY")) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 // envProfile builds a profile purely from DD_API_KEY, DD_APP_KEY and
@@ -213,7 +232,7 @@ func envProfile() *Profile {
 			site = v
 		}
 	}
-	return &Profile{Name: "env", APIKey: api, AppKey: app, Site: site, MaxResults: 25}
+	return &Profile{Name: "env", APIKey: api, AppKey: app, Site: site, MaxResults: 25, ReadOnly: envReadOnly()}
 }
 
 // Save writes the profile atomically (temp file + rename), readable only by

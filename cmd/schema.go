@@ -27,6 +27,7 @@ type cmdSchema struct {
 	Long        string       `json:"long,omitempty"`
 	Aliases     []string     `json:"aliases,omitempty"`
 	JSONOutput  bool         `json:"json_output"`
+	Mutates     bool         `json:"mutates,omitempty"` // changes Datadog: ask first`
 	Flags       []flagSchema `json:"flags,omitempty"`
 	Subcommands []cmdSchema  `json:"subcommands,omitempty"`
 }
@@ -63,6 +64,7 @@ func buildSchema(c *cobra.Command) cmdSchema {
 		Use:     c.Use,
 		Short:   c.Short,
 		Aliases: c.Aliases,
+		Mutates: mutates(c),
 	}
 	if schemaFull {
 		s.Long = c.Long

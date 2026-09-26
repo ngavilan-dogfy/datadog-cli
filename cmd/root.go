@@ -70,7 +70,7 @@ their own: no setup needed in CI or containers.`,
 		cfg, _ = config.LoadActive()
 		if cfg != nil && cfg.IsAuthenticated() {
 			client = buildClient(cfg)
-			return nil
+			return guardReadOnly(cmd)
 		}
 		if !needsAuth(cmd) {
 			return nil
@@ -88,7 +88,7 @@ their own: no setup needed in CI or containers.`,
 			return notSetUpError()
 		}
 		client = buildClient(cfg)
-		return nil
+		return guardReadOnly(cmd)
 	},
 }
 
