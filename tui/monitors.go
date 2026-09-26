@@ -699,7 +699,7 @@ func (v *monitorView) detailLines(width int) []string {
 		out = append(out, "    "+fg(th.cyan).Render(l))
 	}
 	out = append(out, "", "  "+sBold().Render("Message"))
-	msg := cleanMonitorMessage(m.Message)
+	msg := cleanMonitorMessage(m.Message, m.OverallState, m.Priority)
 	if msg == "" {
 		out = append(out, "    "+sMuted().Render("(none)"))
 	}
@@ -709,12 +709,89 @@ func (v *monitorView) detailLines(width int) []string {
 	return out
 }
 
-var reTemplateBlock = regexp.MustCompile(`\{\{\s*[#/^][^}]*\}\}`)
+var reTemplateTag = regexp.MustCompile(`\{\{\s*([#/^])\s*([a-z_]+)([^}]*)\}\}`)
 
-// cleanMonitorMessage hides template noise: {{#is_alert}} blocks and the
-// like stay readable as plain text; @handles are kept (who gets paged).
-func cleanMonitorMessage(s string) string {
-	s = reTemplateBlock.ReplaceAllString(s, "")
+// cleanMonitorMessage shows the message as it reads in the current state:
+// {{#is_alert}} text when alerting, {{#is_warning}} text when warning, and
+// so on; conditions it can't judge (is_match…) keep their text. When
+// nothing is left (an OK monitor whose message only speaks of alerts),
+// every block shows instead. @handles are kept: they say who gets paged.
+func cleanMonitorMessage(s, state string, priority *int) string {
+	if out := tidyMessage(renderConditionals(s, state, priority)); out != "" {
+		return out
+	}
+	return tidyMessage(reTemplateTag.ReplaceAllString(s, ""))
+}
+
+func renderConditionals(s, state string, priority *int) string {
+	state = monitorState(state)
+	holds := func(name, args string) bool {
+		switch name {
+		case "is_alert":
+			return state == "Alert"
+		case "is_warning", "is_alert_to_warning":
+			return state == "Warn"
+		case "is_no_data":
+			return state == "No Data"
+		case "is_recovery", "is_alert_recovery", "is_warning_recovery", "is_no_data_recovery":
+			return state == "OK"
+		case "is_renotify", "is_warning_to_alert":
+			return false
+		case "is_priority":
+			p := strings.Trim(strings.TrimSpace(args), `'"`)
+			return priority != nil && strings.EqualFold(p, fmt.Sprintf("P%d", *priority))
+		}
+		return true // is_match, is_exact_match…: depends on the group
+	}
+	var out []string
+	var stack []bool
+	visible := func() bool {
+		for _, v := range stack {
+			if !v {
+				return false
+			}
+		}
+		return true
+	}
+	// Line by line, so a line that only held hidden template disappears
+	// instead of leaving a gap; blank lines stay where they're visible.
+	for _, line := range strings.Split(s, "\n") {
+		if strings.TrimSpace(line) == "" {
+			if visible() {
+				out = append(out, "")
+			}
+			continue
+		}
+		var b strings.Builder
+		last := 0
+		for _, m := range reTemplateTag.FindAllStringSubmatchIndex(line, -1) {
+			if visible() {
+				b.WriteString(line[last:m[0]])
+			}
+			last = m[1]
+			kind, name, args := line[m[2]:m[3]], line[m[4]:m[5]], line[m[6]:m[7]]
+			switch kind {
+			case "#":
+				stack = append(stack, holds(name, args))
+			case "^":
+				stack = append(stack, !holds(name, args))
+			case "/":
+				if len(stack) > 0 {
+					stack = stack[:len(stack)-1]
+				}
+			}
+		}
+		if visible() {
+			b.WriteString(line[last:])
+		}
+		if strings.TrimSpace(b.String()) != "" {
+			out = append(out, b.String())
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+func tidyMessage(s string) string {
 	var lines []string
 	for _, l := range strings.Split(s, "\n") {
 		if strings.TrimSpace(l) != "" || (len(lines) > 0 && lines[len(lines)-1] != "") {
