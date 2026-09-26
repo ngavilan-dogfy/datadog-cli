@@ -179,6 +179,6 @@ func init() {
 	securityCmd.Flags().BoolVar(&securityJSON, "json", false, "Output as JSON array")
 	securityCmd.Flags().BoolVar(&securityPlain, "plain", false, "Force plain TSV output")
 	securityCmd.Flags().IntVarP(&securityLimit, "limit", "n", 25, "Maximum number of results")
-	securityCmd.Flags().IntVar(&securityMinutes, "minutes", 60, "Minutes of history to search (default 60)")
+	securityCmd.Flags().IntVar(&securityMinutes, "minutes", 60, "Minutes of history to search")
 	rootCmd.AddCommand(securityCmd)
 }

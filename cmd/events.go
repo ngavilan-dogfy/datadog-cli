@@ -262,7 +262,7 @@ func init() {
 	eventsCmd.Flags().BoolVar(&eventsJSON, "json", false, "Output as JSON array")
 	eventsCmd.Flags().BoolVar(&eventsPlain, "plain", false, "Force plain TSV output")
 	eventsCmd.Flags().StringVar(&eventsPriority, "priority", "", "Filter by priority (normal, low)")
-	eventsCmd.Flags().IntVar(&eventsHours, "hours", 24, "Hours of history to show (default 24)")
+	eventsCmd.Flags().IntVar(&eventsHours, "hours", 24, "Hours of history to show")
 
 	eventsPostCmd.Flags().StringVar(&eventPostPri, "priority", "", "Event priority (normal, low)")
 	eventsPostCmd.Flags().StringVar(&eventPostAlert, "alert-type", "", "Alert type (error, warning, info, success)")

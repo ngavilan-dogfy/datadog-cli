@@ -151,6 +151,6 @@ func printUsageTable(result *datadog.UsageSummaryResponse) error {
 func init() {
 	usageCmd.Flags().BoolVar(&usageJSON, "json", false, "Output as JSON")
 	usageCmd.Flags().BoolVar(&usagePlain, "plain", false, "Force plain TSV output")
-	usageCmd.Flags().IntVar(&usageMonths, "months", 1, "Number of months to show (default 1)")
+	usageCmd.Flags().IntVar(&usageMonths, "months", 1, "Number of months to show")
 	rootCmd.AddCommand(usageCmd)
 }

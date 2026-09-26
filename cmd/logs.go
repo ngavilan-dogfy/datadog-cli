@@ -269,12 +269,12 @@ func init() {
 	logsCmd.Flags().BoolVar(&logsAll, "all", false, fmt.Sprintf("Paginate through all results (capped at %d)", logsAllCap))
 	logsCmd.Flags().BoolVar(&logsPlain, "plain", false, "Force plain TSV output")
 	logsCmd.Flags().IntVarP(&logsLimit, "limit", "n", 25, "Maximum number of results")
-	logsCmd.Flags().IntVar(&logsMinutes, "minutes", 15, "Minutes of history to search (default 15)")
+	logsCmd.Flags().IntVar(&logsMinutes, "minutes", 15, "Minutes of history to search")
 	logsCmd.Flags().StringVar(&logsSince, "since", "", "Lookback window as duration (30m, 2h, 1d) — overrides --minutes")
 	logsCmd.Flags().StringVar(&logsFrom, "from", "", "Start time (RFC3339)")
 	logsCmd.Flags().StringVar(&logsTo, "to", "", "End time (RFC3339)")
 
-	logsTailCmd.Flags().IntVar(&tailInterval, "interval", 5, "Poll interval in seconds (default 5)")
+	logsTailCmd.Flags().IntVar(&tailInterval, "interval", 5, "Poll interval in seconds")
 	logsTailCmd.Flags().BoolVar(&tailJSON, "json", false, "Output as JSON lines")
 
 	logsCmd.AddCommand(logsTailCmd)

@@ -201,6 +201,6 @@ func init() {
 	pipelinesCmd.Flags().BoolVar(&pipelinesJSON, "json", false, "Output as JSON array")
 	pipelinesCmd.Flags().BoolVar(&pipelinesPlain, "plain", false, "Force plain TSV output")
 	pipelinesCmd.Flags().IntVarP(&pipelinesLimit, "limit", "n", 25, "Maximum number of results")
-	pipelinesCmd.Flags().IntVar(&pipelinesMinutes, "minutes", 60, "Minutes of history to search (default 60)")
+	pipelinesCmd.Flags().IntVar(&pipelinesMinutes, "minutes", 60, "Minutes of history to search")
 	rootCmd.AddCommand(pipelinesCmd)
 }
