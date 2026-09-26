@@ -87,7 +87,7 @@ func (c *Client) do(method, path string, body interface{}) ([]byte, error) {
 
 		switch {
 		case resp.StatusCode == 429:
-			lastErr = fmt.Errorf("rate limited (429): %s", apiErrorMessage(respBody))
+			lastErr = fmt.Errorf("rate limited (429)%s: %s", rateLimitName(resp), apiErrorMessage(respBody))
 			time.Sleep(retryAfter(resp, attempt))
 			continue
 		case resp.StatusCode >= 500:
@@ -116,11 +116,13 @@ func backoff(attempt int) time.Duration {
 	return time.Duration(attempt+1) * 500 * time.Millisecond
 }
 
-// retryAfter honors the Retry-After header on 429s, capped at 30s.
+// retryAfter waits out a 429: Datadog says when its window resets
+// (X-RateLimit-Reset, in seconds; some endpoints send Retry-After), capped
+// at 30s.
 func retryAfter(resp *http.Response, attempt int) time.Duration {
-	if v := resp.Header.Get("Retry-After"); v != "" {
-		if secs, err := strconv.Atoi(v); err == nil && secs > 0 {
-			d := time.Duration(secs) * time.Second
+	for _, h := range []string{"X-RateLimit-Reset", "Retry-After"} {
+		if secs, err := strconv.Atoi(resp.Header.Get(h)); err == nil && secs >= 0 {
+			d := time.Duration(secs)*time.Second + 250*time.Millisecond
 			if d > 30*time.Second {
 				d = 30 * time.Second
 			}
@@ -128,6 +130,19 @@ func retryAfter(resp *http.Response, attempt int) time.Duration {
 		}
 	}
 	return backoff(attempt)
+}
+
+// rateLimitName says which limit was hit: " (logs_public_search_api: 3 per
+// 10s)".
+func rateLimitName(resp *http.Response) string {
+	name, limit, period := resp.Header.Get("X-RateLimit-Name"), resp.Header.Get("X-RateLimit-Limit"), resp.Header.Get("X-RateLimit-Period")
+	switch {
+	case name != "" && limit != "" && period != "":
+		return fmt.Sprintf(" by %s: %s per %ss", name, limit, period)
+	case name != "":
+		return " by " + name
+	}
+	return ""
 }
 
 // apiErrorMessage extracts Datadog's {"errors": [...]} body into a readable
