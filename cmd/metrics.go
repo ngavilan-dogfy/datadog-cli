@@ -2,14 +2,17 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 	"time"
 
 	"github.com/ngavilan-dogfy/datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/internal/uiprefs"
 	"github.com/ngavilan-dogfy/datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/viz"
+	"golang.org/x/term"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +20,7 @@ var (
 	metricsJSON    bool
 	metricsPlain   bool
 	metricsMinutes int
+	metricsChart   bool
 )
 
 var metricsCmd = &cobra.Command{
@@ -108,11 +112,87 @@ Examples:
 			return printMetricsTSV(result.Series)
 		}
 
-		return printMetricsTable(result, query)
+		return printMetricsTerminal(result, query, from*1000, to*1000)
 	},
 }
 
-// --- helpers ---
+// printMetricsTerminal draws the series as a chart with a legend of
+// per-series stats. Point-by-point data is what --plain and --json are for.
+func printMetricsTerminal(result *datadog.MetricsQueryResponse, query string, fromMs, toMs int64) error {
+	width := 100
+	if w, _, err := term.GetSize(int(os.Stdout.Fd())); err == nil && w > 20 {
+		width = w - 4
+	}
+	palette := viz.Palette()
+	var series []viz.Series
+	var unit viz.Unit
+	for i, s := range result.Series {
+		pts := make([]viz.Point, 0, len(s.Pointlist))
+		for _, p := range s.Pointlist {
+			if len(p) == 2 {
+				pts = append(pts, viz.Point{T: int64(p[0]), V: p[1]})
+			}
+		}
+		name := s.Scope
+		if name == "" || name == "*" {
+			name = s.Expression
+		}
+		series = append(series, viz.Series{Name: name, Color: palette[i%len(palette)], Points: pts})
+		if i == 0 && len(s.Unit) > 0 {
+			u := s.Unit[0]
+			unit = viz.Unit{Family: u.Family, Name: u.Name, Short: u.ShortName, Scale: u.ScaleFactor}
+		}
+	}
+	span := time.Duration(toMs-fromMs) * time.Millisecond
+	fmt.Println()
+	fmt.Println("  " + lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("5")).Render(query) + ui.Dimmed.Render("  · last "+viz.FormatSpan(span.Round(time.Minute))))
+	if metricsChart {
+		c := viz.Chart{Width: width, Height: 14, Series: series, Style: uiprefs.VizStyle(), From: fromMs, To: toMs,
+			Unit: unit, Cursor: -1, Axis: lipgloss.Color("8")}
+		fmt.Println()
+		for _, l := range c.Render() {
+			fmt.Println("  " + l)
+		}
+	}
+	fmt.Println()
+	nameW := 0
+	for _, s := range series {
+		nameW = max(nameW, len([]rune(s.Name)))
+	}
+	nameW = min(nameW, max(20, width-60))
+	shown := series
+	if len(shown) > 12 {
+		shown = shown[:12]
+	}
+	for _, s := range shown {
+		lo, hi, sum, n, last := 0.0, 0.0, 0.0, 0, 0.0
+		for _, p := range s.Points {
+			if n == 0 || p.V < lo {
+				lo = p.V
+			}
+			if n == 0 || p.V > hi {
+				hi = p.V
+			}
+			sum, last = sum+p.V, p.V
+			n++
+		}
+		stats := ui.Dimmed.Render("no data")
+		if n > 0 {
+			f := func(label string, v float64) string {
+				return ui.Dimmed.Render(label+" ") + fmt.Sprintf("%-7s", viz.Format(v, unit))
+			}
+			stats = f("min", lo) + f(" avg", sum/float64(n)) + f(" max", hi) + f(" last", last)
+		}
+		name := truncRunes(s.Name, nameW)
+		fmt.Printf("  %s %s  %s\n", lipgloss.NewStyle().Foreground(s.Color).Render("■"),
+			name+strings.Repeat(" ", nameW-len([]rune(name))), stats)
+	}
+	if len(series) > len(shown) {
+		fmt.Println(ui.Dimmed.Render(fmt.Sprintf("  … and %d more series (see --plain or --json)", len(series)-len(shown))))
+	}
+	fmt.Println()
+	return nil
+}
 
 func printMetricsTSV(series []datadog.MetricsSeries) error {
 	for _, s := range series {
@@ -131,131 +211,6 @@ func printMetricsTSV(series []datadog.MetricsSeries) error {
 	return nil
 }
 
-func printMetricsTable(result *datadog.MetricsQueryResponse, query string) error {
-	fmt.Println(ui.Title.Render(fmt.Sprintf(" Metrics · %s · last %dm", query, metricsMinutes)))
-
-	for _, s := range result.Series {
-		scope := s.Scope
-		if scope == "" {
-			scope = s.Expression
-		}
-		unit := ""
-		if len(s.Unit) > 0 && s.Unit[0].Name != "" {
-			unit = " " + s.Unit[0].Name
-		}
-
-		fmt.Println()
-		fmt.Println(ui.Subtitle.Render(fmt.Sprintf("  %s [%s]", s.Metric, scope)))
-
-		// Show summary stats
-		if len(s.Pointlist) > 0 {
-			var min, max, sum float64
-			min = s.Pointlist[0][1]
-			max = s.Pointlist[0][1]
-			for _, pt := range s.Pointlist {
-				if len(pt) >= 2 {
-					v := pt[1]
-					if v < min {
-						min = v
-					}
-					if v > max {
-						max = v
-					}
-					sum += v
-				}
-			}
-			avg := sum / float64(len(s.Pointlist))
-
-			statsStyle := lipgloss.NewStyle().PaddingLeft(4)
-			fmt.Println(statsStyle.Render(fmt.Sprintf("min: %.4f%s  avg: %.4f%s  max: %.4f%s  points: %d",
-				min, unit, avg, unit, max, unit, len(s.Pointlist))))
-		}
-
-		// Show last N points as table
-		points := s.Pointlist
-		maxShow := 20
-		if len(points) > maxShow {
-			points = points[len(points)-maxShow:]
-		}
-
-		var rows [][]string
-		for _, pt := range points {
-			if len(pt) >= 2 {
-				ts := time.Unix(int64(pt[0])/1000, 0).Format("15:04:05")
-				val := fmt.Sprintf("%.4f%s", pt[1], unit)
-				// Simple bar
-				bar := renderBar(pt[1], min(points), max(points), 20)
-				rows = append(rows, []string{ts, val, bar})
-			}
-		}
-
-		t := table.New().
-			Headers("TIME", "VALUE", "").
-			Rows(rows...).
-			Border(lipgloss.RoundedBorder()).
-			BorderStyle(lipgloss.NewStyle().Foreground(ui.Subtle)).
-			StyleFunc(func(row, col int) lipgloss.Style {
-				if row == table.HeaderRow {
-					return lipgloss.NewStyle().Bold(true).Foreground(ui.Secondary).Padding(0, 1)
-				}
-				s := lipgloss.NewStyle().Padding(0, 1)
-				switch col {
-				case 0:
-					s = s.Foreground(ui.Muted).Width(10)
-				case 1:
-					s = s.Foreground(ui.Text).Width(18)
-				case 2:
-					s = s.Foreground(ui.Success)
-				}
-				return s
-			})
-
-		fmt.Println(t)
-	}
-
-	fmt.Println()
-	fmt.Println(ui.Dimmed.Render(fmt.Sprintf("  %d series", len(result.Series))))
-	return nil
-}
-
-func renderBar(val, minVal, maxVal float64, width int) string {
-	if maxVal == minVal {
-		return strings.Repeat("█", width/2)
-	}
-	ratio := (val - minVal) / (maxVal - minVal)
-	filled := int(ratio * float64(width))
-	if filled < 1 {
-		filled = 1
-	}
-	return strings.Repeat("█", filled)
-}
-
-func min(points [][]float64) float64 {
-	if len(points) == 0 {
-		return 0
-	}
-	m := points[0][1]
-	for _, pt := range points {
-		if len(pt) >= 2 && pt[1] < m {
-			m = pt[1]
-		}
-	}
-	return m
-}
-
-func max(points [][]float64) float64 {
-	if len(points) == 0 {
-		return 0
-	}
-	m := points[0][1]
-	for _, pt := range points {
-		if len(pt) >= 2 && pt[1] > m {
-			m = pt[1]
-		}
-	}
-	return m
-}
-
 func init() {
 	metricsSearchCmd.Flags().BoolVar(&metricsJSON, "json", false, "Output as JSON array")
 	metricsSearchCmd.Flags().BoolVar(&metricsPlain, "plain", false, "Force plain output")
@@ -263,6 +218,7 @@ func init() {
 	metricsQueryCmd.Flags().BoolVar(&metricsJSON, "json", false, "Output as JSON")
 	metricsQueryCmd.Flags().BoolVar(&metricsPlain, "plain", false, "Force plain TSV output")
 	metricsQueryCmd.Flags().IntVar(&metricsMinutes, "minutes", 60, "Minutes of history to query (default 60)")
+	metricsQueryCmd.Flags().BoolVar(&metricsChart, "chart", true, "Draw a chart above the table (terminal only)")
 
 	metricsCmd.AddCommand(metricsSearchCmd)
 	metricsCmd.AddCommand(metricsQueryCmd)

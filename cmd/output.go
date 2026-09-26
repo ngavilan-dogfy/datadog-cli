@@ -34,3 +34,15 @@ func printJSON(v interface{}) error {
 	fmt.Println(string(data))
 	return nil
 }
+
+// truncRunes shortens s to n characters, ending in "…" when cut.
+func truncRunes(s string, n int) string {
+	r := []rune(s)
+	if len(r) <= n {
+		return s
+	}
+	if n <= 1 {
+		return string(r[:n])
+	}
+	return string(r[:n-1]) + "…"
+}
