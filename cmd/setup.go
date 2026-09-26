@@ -492,7 +492,7 @@ func (w *wizard) stepAppKey() error {
 // application keys silently break single areas otherwise.
 func (w *wizard) showAccess() {
 	var checks []check
-	_ = withSpinner("Checking what the keys can read", func() error { checks = accessChecks(buildClient(w.p)); return nil })
+	_ = withSpinner("Checking what the keys can read", func() error { checks = readAccess(buildClient(w.p)); return nil })
 	var ok, missing []string
 	for _, c := range checks {
 		if c.Status == "ok" {
@@ -520,10 +520,16 @@ func (w *wizard) save() error {
 	return nil
 }
 
+// hostname is os.Hostname; the e2e build fixes it for recordings.
+var hostname = os.Hostname
+
+// readAccess checks what the keys can read; swappable for recordings.
+var readAccess = accessChecks
+
 // keyName is what to call the keys in Datadog, so whoever reviews them
 // later knows where they're used.
 func keyName() string {
-	host, _ := os.Hostname()
+	host, _ := hostname()
 	host = strings.TrimSuffix(strings.TrimSuffix(host, ".local"), ".lan")
 	if i := strings.IndexByte(host, '.'); i > 0 {
 		host = host[:i]

@@ -4,6 +4,7 @@
 #   make build          build into bin/datadog
 #   make check          vet + test + build: run it before committing
 #   make release        every release binary + checksums.txt into dist/
+#   make e2e            bin/datadog-e2e, whose setup accepts made-up keys (recordings)
 #
 # Most people don't need this: the README has the one-line installer.
 # Releases are cut by CI from conventional commits (see CONTRIBUTING.md).
@@ -18,7 +19,7 @@ BINDIR   := $(PREFIX)/bin
 VERSION  ?= $(shell git describe --tags --exact-match --match 'v[0-9]*' 2>/dev/null || echo dev)
 LDFLAGS  := -s -w -X $(MODULE)/cmd.Version=$(VERSION)
 
-.PHONY: build install uninstall test vet check release clean
+.PHONY: build install uninstall test vet check release e2e clean
 
 build:
 	@command -v go >/dev/null 2>&1 || { echo "Go is not installed: https://go.dev/dl (or: brew install go)"; exit 1; }
@@ -52,6 +53,12 @@ check: vet test build
 
 release:
 	scripts/build-release.sh $(VERSION)
+
+# DATADOG_E2E_API_KEY / DATADOG_E2E_APP_KEY make setup accept those keys
+# without Datadog; see cmd/e2e_hooks.go. Never shipped.
+e2e:
+	@mkdir -p bin
+	go build -tags e2e -ldflags "$(LDFLAGS)" -o bin/$(BINARY)-e2e ./cmd/$(BINARY)
 
 clean:
 	rm -rf bin/ dist/

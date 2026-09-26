@@ -1,0 +1,33 @@
+Output setup.gif
+Set Shell "bash"
+Set FontFamily "FuraMono Nerd Font Mono"
+Set FontSize 16
+Set Width 1060
+Set Height 860
+Set Padding 20
+Set Theme { "name": "Gruvbox Dark", "background": "#292929", "foreground": "#ebdbb2", "black": "#292929", "red": "#f77768", "green": "#b8bb26", "yellow": "#fabd2f", "blue": "#84a498", "magenta": "#d3859a", "cyan": "#8ec07b", "white": "#ebdbb2", "brightBlack": "#928374", "brightRed": "#f77768", "brightGreen": "#b8bb26", "brightYellow": "#fabd2f", "brightBlue": "#84a498", "brightMagenta": "#d3859a", "brightCyan": "#8ec07b", "brightWhite": "#ebdbb2", "selection": "#504945", "cursor": "#ebdbb2" }
+Set TypingSpeed 55ms
+Hide
+Type "export HOME=@R@/home PS1='$ ' DATADOG_E2E_API_KEY=@API@ DATADOG_E2E_APP_KEY=@APP@ DATADOG_E2E_LOG=@R@/open.log DATADOG_NO_UPDATE_NOTIFIER=1 PATH=@R@/bin:$PATH && clear"
+Enter
+Sleep 500ms
+Show
+Sleep 600ms
+Type "datadog setup"
+Sleep 600ms
+Enter
+Sleep 2s
+Enter
+Sleep 2.4s
+Enter
+Sleep 6.5s
+Enter
+Sleep 8s
+Enter
+Sleep 1.6s
+Enter
+Sleep 1.6s
+Enter
+Sleep 2.2s
+Type "n"
+Sleep 3.5s
