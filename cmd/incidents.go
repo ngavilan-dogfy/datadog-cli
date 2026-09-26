@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"datadog-cli/datadog"
-	"datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/ui"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -13,9 +13,9 @@ import (
 )
 
 var (
-	incidentsJSON     bool
-	incidentsPlain    bool
-	incidentShowJSON  bool
+	incidentsJSON    bool
+	incidentsPlain   bool
+	incidentShowJSON bool
 )
 
 var incidentsCmd = &cobra.Command{

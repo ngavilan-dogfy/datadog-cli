@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"datadog-cli/tui"
+	"github.com/ngavilan-dogfy/datadog-cli/tui"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"

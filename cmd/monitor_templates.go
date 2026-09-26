@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
 
 	"gopkg.in/yaml.v3"
 )

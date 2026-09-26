@@ -14,21 +14,21 @@ type ValidateResponse struct {
 // --- Monitors ---
 
 type Monitor struct {
-	ID           int64           `json:"id"`
-	OrgID        int64           `json:"org_id"`
-	Name         string          `json:"name"`
-	Type         string          `json:"type"`
-	Query        string          `json:"query"`
-	Message      string          `json:"message"`
-	Tags         []string        `json:"tags"`
-	OverallState string          `json:"overall_state"`
-	Priority     *int            `json:"priority"`
-	Created      string          `json:"created"`
-	Modified     string          `json:"modified"`
-	Creator      Creator         `json:"creator"`
-	Options      MonitorOptions  `json:"options"`
-	Multi        bool            `json:"multi"`
-	Deleted      *string         `json:"deleted"`
+	ID                int64              `json:"id"`
+	OrgID             int64              `json:"org_id"`
+	Name              string             `json:"name"`
+	Type              string             `json:"type"`
+	Query             string             `json:"query"`
+	Message           string             `json:"message"`
+	Tags              []string           `json:"tags"`
+	OverallState      string             `json:"overall_state"`
+	Priority          *int               `json:"priority"`
+	Created           string             `json:"created"`
+	Modified          string             `json:"modified"`
+	Creator           Creator            `json:"creator"`
+	Options           MonitorOptions     `json:"options"`
+	Multi             bool               `json:"multi"`
+	Deleted           *string            `json:"deleted"`
 	MatchingDowntimes []MatchingDowntime `json:"matching_downtimes"`
 }
 
@@ -48,9 +48,9 @@ type MonitorOptions struct {
 }
 
 type MatchingDowntime struct {
-	ID    int64 `json:"id"`
+	ID    int64    `json:"id"`
 	Scope []string `json:"scope"`
-	End   *int64 `json:"end"`
+	End   *int64   `json:"end"`
 }
 
 // --- Dashboards ---
@@ -74,16 +74,16 @@ type DashboardListResponse struct {
 // --- Hosts ---
 
 type Host struct {
-	Name            string   `json:"name"`
-	Aliases         []string `json:"aliases"`
-	Apps            []string `json:"apps"`
-	IsMuted         bool     `json:"is_muted"`
-	LastReportedTime int64   `json:"last_reported_time"`
-	Meta            HostMeta `json:"meta"`
-	Sources         []string `json:"sources"`
-	Up              bool     `json:"up"`
-	HostName        string   `json:"host_name"`
-	MuteTimeout     *int64   `json:"mute_timeout"`
+	Name             string   `json:"name"`
+	Aliases          []string `json:"aliases"`
+	Apps             []string `json:"apps"`
+	IsMuted          bool     `json:"is_muted"`
+	LastReportedTime int64    `json:"last_reported_time"`
+	Meta             HostMeta `json:"meta"`
+	Sources          []string `json:"sources"`
+	Up               bool     `json:"up"`
+	HostName         string   `json:"host_name"`
+	MuteTimeout      *int64   `json:"mute_timeout"`
 }
 
 type HostMeta struct {
@@ -192,27 +192,27 @@ type DowntimeData struct {
 }
 
 type DowntimeAttributes struct {
-	Scope             string                  `json:"scope"`
-	Message           *string                 `json:"message"`
-	MonitorIdentifier *DowntimeMonitorID      `json:"monitor_identifier"`
-	Schedule          *DowntimeSchedule       `json:"schedule"`
-	Status            string                  `json:"status"`
-	DisplayTimezone   string                  `json:"display_timezone"`
-	CreatedAt         string                  `json:"created_at"`
-	ModifiedAt        string                  `json:"modified_at"`
-	Canceled          *string                 `json:"canceled"`
-	MuteFirstRecoveryNotification bool        `json:"mute_first_recovery_notification"`
+	Scope                         string             `json:"scope"`
+	Message                       *string            `json:"message"`
+	MonitorIdentifier             *DowntimeMonitorID `json:"monitor_identifier"`
+	Schedule                      *DowntimeSchedule  `json:"schedule"`
+	Status                        string             `json:"status"`
+	DisplayTimezone               string             `json:"display_timezone"`
+	CreatedAt                     string             `json:"created_at"`
+	ModifiedAt                    string             `json:"modified_at"`
+	Canceled                      *string            `json:"canceled"`
+	MuteFirstRecoveryNotification bool               `json:"mute_first_recovery_notification"`
 }
 
 type DowntimeMonitorID struct {
-	MonitorID   *int64  `json:"monitor_id"`
+	MonitorID   *int64   `json:"monitor_id"`
 	MonitorTags []string `json:"monitor_tags"`
 }
 
 type DowntimeSchedule struct {
-	Start       string  `json:"start"`
-	End         *string `json:"end"`
-	Timezone    string  `json:"timezone"`
+	Start    string  `json:"start"`
+	End      *string `json:"end"`
+	Timezone string  `json:"timezone"`
 }
 
 type CreateDowntimeRequest struct {
@@ -225,17 +225,17 @@ type CreateDowntimeData struct {
 }
 
 type CreateDowntimeAttributes struct {
-	Scope             string              `json:"scope"`
-	Message           string              `json:"message,omitempty"`
-	MonitorIdentifier *DowntimeMonitorID  `json:"monitor_identifier,omitempty"`
-	Schedule          *DowntimeSchedule   `json:"schedule,omitempty"`
-	MuteFirstRecoveryNotification bool    `json:"mute_first_recovery_notification"`
+	Scope                         string             `json:"scope"`
+	Message                       string             `json:"message,omitempty"`
+	MonitorIdentifier             *DowntimeMonitorID `json:"monitor_identifier,omitempty"`
+	Schedule                      *DowntimeSchedule  `json:"schedule,omitempty"`
+	MuteFirstRecoveryNotification bool               `json:"mute_first_recovery_notification"`
 }
 
 // --- Incidents (v2) ---
 
 type IncidentsResponse struct {
-	Data []IncidentData `json:"data"`
+	Data []IncidentData  `json:"data"`
 	Meta *PaginationMeta `json:"meta"`
 }
 
@@ -244,24 +244,24 @@ type IncidentDetailResponse struct {
 }
 
 type IncidentData struct {
-	ID         string              `json:"id"`
-	Type       string              `json:"type"`
-	Attributes IncidentAttributes  `json:"attributes"`
+	ID         string             `json:"id"`
+	Type       string             `json:"type"`
+	Attributes IncidentAttributes `json:"attributes"`
 }
 
 type IncidentAttributes struct {
-	Title             string  `json:"title"`
-	Status            string  `json:"status"` // active, stable, resolved
-	Severity          string  `json:"severity"`
-	Created           string  `json:"created"`
-	Modified          string  `json:"modified"`
-	CustomerImpacted  bool    `json:"customer_impact_scope_is_set"`
-	CustomerImpactScope string `json:"customer_impact_scope"`
-	Detected          string  `json:"detected"`
-	Resolved          *string `json:"resolved"`
-	TimeToDetect      *int64  `json:"time_to_detect"`
-	TimeToRepair      *int64  `json:"time_to_repair"`
-	CommanderUser     *IncidentUser `json:"commander_user"`
+	Title               string        `json:"title"`
+	Status              string        `json:"status"` // active, stable, resolved
+	Severity            string        `json:"severity"`
+	Created             string        `json:"created"`
+	Modified            string        `json:"modified"`
+	CustomerImpacted    bool          `json:"customer_impact_scope_is_set"`
+	CustomerImpactScope string        `json:"customer_impact_scope"`
+	Detected            string        `json:"detected"`
+	Resolved            *string       `json:"resolved"`
+	TimeToDetect        *int64        `json:"time_to_detect"`
+	TimeToRepair        *int64        `json:"time_to_repair"`
+	CommanderUser       *IncidentUser `json:"commander_user"`
 }
 
 type IncidentUser struct {
@@ -290,32 +290,32 @@ type SLODetailResponse struct {
 }
 
 type SLO struct {
-	ID          string         `json:"id"`
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	Tags        []string       `json:"tags"`
-	Type        string         `json:"type"` // metric, monitor
-	Thresholds  []SLOThreshold `json:"thresholds"`
-	Creator     Creator        `json:"creator"`
-	CreatedAt   int64          `json:"created_at"`
-	ModifiedAt  int64          `json:"modified_at"`
+	ID            string             `json:"id"`
+	Name          string             `json:"name"`
+	Description   string             `json:"description"`
+	Tags          []string           `json:"tags"`
+	Type          string             `json:"type"` // metric, monitor
+	Thresholds    []SLOThreshold     `json:"thresholds"`
+	Creator       Creator            `json:"creator"`
+	CreatedAt     int64              `json:"created_at"`
+	ModifiedAt    int64              `json:"modified_at"`
 	OverallStatus []SLOOverallStatus `json:"overall_status"`
 }
 
 type SLOThreshold struct {
-	Target      float64  `json:"target"`
-	Timeframe   string   `json:"timeframe"` // 7d, 30d, 90d
-	TargetDisplay string `json:"target_display"`
-	Warning     *float64 `json:"warning"`
+	Target        float64  `json:"target"`
+	Timeframe     string   `json:"timeframe"` // 7d, 30d, 90d
+	TargetDisplay string   `json:"target_display"`
+	Warning       *float64 `json:"warning"`
 }
 
 type SLOOverallStatus struct {
-	SLI                float64 `json:"sli_value"`
-	Target             float64 `json:"target"`
-	Timeframe          string  `json:"timeframe"`
+	SLI                  float64 `json:"sli_value"`
+	Target               float64 `json:"target"`
+	Timeframe            string  `json:"timeframe"`
 	ErrorBudgetRemaining float64 `json:"error_budget_remaining"`
-	Status             string  `json:"status"` // OK, WARNING, BREACHED
-	SpanPrecision      int     `json:"span_precision"`
+	Status               string  `json:"status"` // OK, WARNING, BREACHED
+	SpanPrecision        int     `json:"span_precision"`
 }
 
 // --- Metrics ---
@@ -329,24 +329,24 @@ type MetricsResults struct {
 }
 
 type MetricsQueryResponse struct {
-	Series []MetricsSeries `json:"series"`
-	Status string          `json:"status"`
-	FromDate int64         `json:"from_date"`
-	ToDate   int64         `json:"to_date"`
-	Query    string        `json:"query"`
+	Series   []MetricsSeries `json:"series"`
+	Status   string          `json:"status"`
+	FromDate int64           `json:"from_date"`
+	ToDate   int64           `json:"to_date"`
+	Query    string          `json:"query"`
 }
 
 type MetricsSeries struct {
-	Metric     string      `json:"metric"`
-	Pointlist  [][]float64 `json:"pointlist"`
-	Scope      string      `json:"scope"`
-	Expression string      `json:"expression"`
-	DisplayName string     `json:"display_name"`
-	Unit       []MetricsUnit `json:"unit"`
-	Start      int64       `json:"start"`
-	End        int64       `json:"end"`
-	Interval   int         `json:"interval"`
-	Length     int         `json:"length"`
+	Metric      string        `json:"metric"`
+	Pointlist   [][]float64   `json:"pointlist"`
+	Scope       string        `json:"scope"`
+	Expression  string        `json:"expression"`
+	DisplayName string        `json:"display_name"`
+	Unit        []MetricsUnit `json:"unit"`
+	Start       int64         `json:"start"`
+	End         int64         `json:"end"`
+	Interval    int           `json:"interval"`
+	Length      int           `json:"length"`
 }
 
 type MetricsUnit struct {

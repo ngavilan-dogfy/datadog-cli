@@ -1,4 +1,4 @@
-module datadog-cli
+module github.com/ngavilan-dogfy/datadog-cli
 
 go 1.25.0
 

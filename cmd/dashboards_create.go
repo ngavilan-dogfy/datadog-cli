@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/ui"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"

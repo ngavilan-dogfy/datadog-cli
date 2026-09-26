@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"datadog-cli/config"
-	"datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/config"
+	"github.com/ngavilan-dogfy/datadog-cli/ui"
 
 	"github.com/spf13/cobra"
 )

@@ -8,19 +8,19 @@ import (
 	"path/filepath"
 	"strings"
 
-	"datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/ui"
 
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
 
 var (
-	dashGetJSON   bool
-	dashExportOut string
-	dashCloneName string
-	dashCloneJSON bool
+	dashGetJSON     bool
+	dashExportOut   string
+	dashCloneName   string
+	dashCloneJSON   bool
 	dashDeleteForce bool
-	dashImportJSON bool
+	dashImportJSON  bool
 )
 
 // --- get ---------------------------------------------------------------

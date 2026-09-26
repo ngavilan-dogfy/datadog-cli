@@ -5,19 +5,19 @@ import (
 	"strings"
 	"time"
 
-	"datadog-cli/datadog"
-	"datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/ui"
 
 	"github.com/spf13/cobra"
 )
 
 var (
-	tracesJSON     bool
-	tracesPlain    bool
-	tracesLimit    int
-	tracesMinutes  int
-	tracesFrom     string
-	tracesTo       string
+	tracesJSON       bool
+	tracesPlain      bool
+	tracesLimit      int
+	tracesMinutes    int
+	tracesFrom       string
+	tracesTo         string
 	tracesErrorsOnly bool
 )
 
@@ -73,16 +73,16 @@ Examples:
 }
 
 type spanJSONOut struct {
-	Timestamp string `json:"timestamp"`
-	TraceID   string `json:"trace_id"`
-	SpanID    string `json:"span_id"`
-	Service   string `json:"service"`
-	Resource  string `json:"resource"`
-	Operation string `json:"operation"`
+	Timestamp  string  `json:"timestamp"`
+	TraceID    string  `json:"trace_id"`
+	SpanID     string  `json:"span_id"`
+	Service    string  `json:"service"`
+	Resource   string  `json:"resource"`
+	Operation  string  `json:"operation"`
 	DurationMS float64 `json:"duration_ms"`
-	Status    string `json:"status"`
-	Env       string `json:"env"`
-	Host      string `json:"host"`
+	Status     string  `json:"status"`
+	Env        string  `json:"env"`
+	Host       string  `json:"host"`
 }
 
 func spansToJSON(spans []datadog.SpanData) []spanJSONOut {

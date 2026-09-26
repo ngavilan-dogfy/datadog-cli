@@ -5,7 +5,7 @@ import (
 	"io"
 	"strconv"
 
-	"datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"

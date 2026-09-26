@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"datadog-cli/datadog"
-	"datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/ui"
 
 	"github.com/spf13/cobra"
 )

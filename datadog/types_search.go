@@ -33,17 +33,17 @@ type SpanData struct {
 
 type SpanAttributes struct {
 	// Top-level fields per the v2 /spans/events/search response.
-	StartTimestamp string `json:"start_timestamp"`
-	EndTimestamp   string `json:"end_timestamp"`
-	Service        string `json:"service"`
-	ResourceName   string `json:"resource_name"`
-	OperationName  string `json:"operation_name"`
-	Env            string `json:"env"`
-	Host           string `json:"host"`
-	SpanID         string `json:"span_id"`
-	ParentID       string `json:"parent_id"`
-	Status         string `json:"status"`
-	Type           string `json:"type"`
+	StartTimestamp string                 `json:"start_timestamp"`
+	EndTimestamp   string                 `json:"end_timestamp"`
+	Service        string                 `json:"service"`
+	ResourceName   string                 `json:"resource_name"`
+	OperationName  string                 `json:"operation_name"`
+	Env            string                 `json:"env"`
+	Host           string                 `json:"host"`
+	SpanID         string                 `json:"span_id"`
+	ParentID       string                 `json:"parent_id"`
+	Status         string                 `json:"status"`
+	Type           string                 `json:"type"`
 	Tags           []string               `json:"tags"`
 	Custom         map[string]interface{} `json:"custom"`
 }
@@ -172,8 +172,8 @@ type LogsAggregateData struct {
 }
 
 type LogsAggregateBucket struct {
-	By         map[string]string      `json:"by"`
-	Computes   map[string]interface{} `json:"computes"`
+	By       map[string]string      `json:"by"`
+	Computes map[string]interface{} `json:"computes"`
 }
 
 // --- Monitor /search ---

@@ -38,10 +38,10 @@ type SyntheticsAssertion struct {
 }
 
 type SyntheticsOptions struct {
-	TickEvery      int  `json:"tick_every"`
-	FollowRedirects bool `json:"follow_redirects"`
-	MinFailureDuration int `json:"min_failure_duration"`
-	MinLocationFailed  int `json:"min_location_failed"`
+	TickEvery          int  `json:"tick_every"`
+	FollowRedirects    bool `json:"follow_redirects"`
+	MinFailureDuration int  `json:"min_failure_duration"`
+	MinLocationFailed  int  `json:"min_location_failed"`
 }
 
 type SyntheticsListResponse struct {
@@ -95,16 +95,16 @@ type ServiceCatalogMeta struct {
 }
 
 type ServiceCatalogSchema struct {
-	DDService   string        `json:"dd-service"`
-	Team        string        `json:"team"`
-	Description string        `json:"description"`
-	Tier        string        `json:"tier"`
-	Lifecycle   string        `json:"lifecycle"`
-	Application string        `json:"application"`
-	Languages   []string      `json:"languages"`
-	Type        string        `json:"type"`
-	Links       []ServiceLink `json:"links"`
-	Tags        []string      `json:"tags"`
+	DDService   string           `json:"dd-service"`
+	Team        string           `json:"team"`
+	Description string           `json:"description"`
+	Tier        string           `json:"tier"`
+	Lifecycle   string           `json:"lifecycle"`
+	Application string           `json:"application"`
+	Languages   []string         `json:"languages"`
+	Type        string           `json:"type"`
+	Links       []ServiceLink    `json:"links"`
+	Tags        []string         `json:"tags"`
 	Contacts    []ServiceContact `json:"contacts"`
 }
 
@@ -205,21 +205,21 @@ type CIPipelinesResponse struct {
 }
 
 type CIPipelineEvent struct {
-	ID         string                `json:"id"`
-	Type       string                `json:"type"`
-	Attributes CIPipelineAttributes  `json:"attributes"`
+	ID         string               `json:"id"`
+	Type       string               `json:"type"`
+	Attributes CIPipelineAttributes `json:"attributes"`
 }
 
 type CIPipelineAttributes struct {
-	Status     string `json:"status"`     // success, error, canceled, skipped
-	Level      string `json:"level"`      // pipeline, stage, job
-	Name       string `json:"name"`
-	Service    string `json:"service"`
-	Duration   *int64 `json:"duration"`   // nanoseconds
-	Start      string `json:"start"`
-	End        string `json:"end"`
-	PipelineID string `json:"pipeline_id"`
-	URL        string `json:"url"`
+	Status     string           `json:"status"` // success, error, canceled, skipped
+	Level      string           `json:"level"`  // pipeline, stage, job
+	Name       string           `json:"name"`
+	Service    string           `json:"service"`
+	Duration   *int64           `json:"duration"` // nanoseconds
+	Start      string           `json:"start"`
+	End        string           `json:"end"`
+	PipelineID string           `json:"pipeline_id"`
+	URL        string           `json:"url"`
 	Error      *CIPipelineError `json:"error"`
 }
 

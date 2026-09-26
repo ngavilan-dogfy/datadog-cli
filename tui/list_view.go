@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
 
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
@@ -128,7 +128,7 @@ func (v *listView) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmdAutoRefresh(30*time.Second))
 			return v, tea.Batch(cmds...)
 		}
-		return v, cmdAutoRefresh(30*time.Second)
+		return v, cmdAutoRefresh(30 * time.Second)
 
 	case tea.KeyMsg:
 		// Don't intercept keys during filtering

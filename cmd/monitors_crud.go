@@ -8,8 +8,8 @@ import (
 	"strconv"
 	"strings"
 
-	"datadog-cli/datadog"
-	"datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/ui"
 
 	"github.com/spf13/cobra"
 )
@@ -378,11 +378,11 @@ Examples:
 
 		// Build exportable definition
 		export := datadog.CreateMonitorRequest{
-			Name:    monitor.Name,
-			Type:    monitor.Type,
-			Query:   monitor.Query,
-			Message: monitor.Message,
-			Tags:    monitor.Tags,
+			Name:     monitor.Name,
+			Type:     monitor.Type,
+			Query:    monitor.Query,
+			Message:  monitor.Message,
+			Tags:     monitor.Tags,
 			Priority: monitor.Priority,
 			Options: map[string]interface{}{
 				"thresholds":     monitor.Options.Thresholds,

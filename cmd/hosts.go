@@ -6,8 +6,8 @@ import (
 
 	"time"
 
-	"datadog-cli/datadog"
-	"datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/ui"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -15,12 +15,12 @@ import (
 )
 
 var (
-	hostsJSON    bool
-	hostsPlain   bool
-	hostsFilter  string
-	hostsLimit   int
-	hostMuteDur  string
-	hostMuteMsg  string
+	hostsJSON   bool
+	hostsPlain  bool
+	hostsFilter string
+	hostsLimit  int
+	hostMuteDur string
+	hostMuteMsg string
 )
 
 var hostsCmd = &cobra.Command{

@@ -1,12 +1,12 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS  = -ldflags "-X datadog-cli/cmd.Version=$(VERSION)"
+LDFLAGS  = -ldflags "-X github.com/ngavilan-dogfy/datadog-cli/cmd.Version=$(VERSION)"
 BIN      = datadog-cli
 PREFIX  ?= /usr/local
 
 .PHONY: build test vet check install clean
 
 build:
-	go build $(LDFLAGS) -o $(BIN) .
+	go build $(LDFLAGS) -o $(BIN) ./cmd/datadog
 
 test:
 	go test ./...

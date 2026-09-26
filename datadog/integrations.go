@@ -12,10 +12,10 @@ type GCPAccountsResponse struct {
 }
 
 type GCPAccount struct {
-	ID         string              `json:"id"`
-	Type       string              `json:"type"`
+	ID         string               `json:"id"`
+	Type       string               `json:"type"`
 	Attributes GCPAccountAttributes `json:"attributes"`
-	Meta       *GCPAccountMeta     `json:"meta,omitempty"`
+	Meta       *GCPAccountMeta      `json:"meta,omitempty"`
 }
 
 type GCPAccountAttributes struct {
@@ -60,9 +60,9 @@ type GCPAccountPatchRequest struct {
 }
 
 type GCPAccountPatchData struct {
-	ID         string                      `json:"id"`
-	Type       string                      `json:"type"`
-	Attributes GCPAccountPatchAttributes   `json:"attributes"`
+	ID         string                    `json:"id"`
+	Type       string                    `json:"type"`
+	Attributes GCPAccountPatchAttributes `json:"attributes"`
 }
 
 type GCPAccountPatchAttributes struct {

@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"datadog-cli/config"
-	"datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/config"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
 
 	"github.com/spf13/cobra"
 )
@@ -110,7 +110,7 @@ Environment variables DD_API_KEY, DD_APP_KEY, DD_SITE override profile settings.
 }
 
 func Execute() {
-	datadog.UserAgent = "datadog-cli/" + Version
+	datadog.UserAgent = "github.com/ngavilan-dogfy/datadog-cli/" + Version
 	if err := rootCmd.Execute(); err != nil {
 		if wantsJSON() {
 			// One parseable line on stderr for scripts/agents running with --json.

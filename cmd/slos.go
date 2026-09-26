@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"datadog-cli/datadog"
-	"datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/ui"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
@@ -14,10 +14,10 @@ import (
 )
 
 var (
-	slosJSON     bool
-	slosPlain    bool
-	slosQuery    string
-	sloShowJSON  bool
+	slosJSON    bool
+	slosPlain   bool
+	slosQuery   string
+	sloShowJSON bool
 )
 
 var slosCmd = &cobra.Command{
@@ -89,14 +89,14 @@ Examples:
 // --- helpers ---
 
 type sloJSONOut struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	Type        string  `json:"type"`
-	Target      float64 `json:"target,omitempty"`
-	Timeframe   string  `json:"timeframe,omitempty"`
-	Description string  `json:"description,omitempty"`
+	ID          string   `json:"id"`
+	Name        string   `json:"name"`
+	Type        string   `json:"type"`
+	Target      float64  `json:"target,omitempty"`
+	Timeframe   string   `json:"timeframe,omitempty"`
+	Description string   `json:"description,omitempty"`
 	Tags        []string `json:"tags,omitempty"`
-	URL         string  `json:"url"`
+	URL         string   `json:"url"`
 }
 
 func slosToJSON(slos []datadog.SLO) []sloJSONOut {

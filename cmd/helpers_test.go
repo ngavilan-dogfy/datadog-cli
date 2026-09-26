@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
 )
 
 func TestParseDateEpochSeconds(t *testing.T) {

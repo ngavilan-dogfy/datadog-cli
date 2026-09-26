@@ -20,8 +20,8 @@ var (
 		MarginBottom(1)
 
 	Subtitle = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(Secondary)
+			Bold(true).
+			Foreground(Secondary)
 
 	Key = lipgloss.NewStyle().
 		Bold(true).
@@ -35,24 +35,24 @@ var (
 		Foreground(Text)
 
 	SuccessStyle = lipgloss.NewStyle().
-		Foreground(Success).
-		Bold(true)
+			Foreground(Success).
+			Bold(true)
 
 	ErrorStyle = lipgloss.NewStyle().
-		Foreground(Danger).
-		Bold(true)
+			Foreground(Danger).
+			Bold(true)
 
 	Dimmed = lipgloss.NewStyle().
 		Foreground(Muted)
 
 	SectionHeader = lipgloss.NewStyle().
-		Bold(true).
-		Foreground(Secondary).
-		BorderBottom(true).
-		BorderStyle(lipgloss.NormalBorder()).
-		BorderForeground(Subtle).
-		MarginTop(1).
-		MarginBottom(1)
+			Bold(true).
+			Foreground(Secondary).
+			BorderBottom(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			BorderForeground(Subtle).
+			MarginTop(1).
+			MarginBottom(1)
 )
 
 // MonitorStateColor maps Datadog monitor overall_state to colors.

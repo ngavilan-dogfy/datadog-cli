@@ -6,8 +6,8 @@ import (
 	"sync"
 	"time"
 
-	"datadog-cli/datadog"
-	"datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/ui"
 
 	"github.com/spf13/cobra"
 )
@@ -31,14 +31,14 @@ type serviceContextOut struct {
 	Summary     map[string]int    `json:"summary"`
 	Errors      map[string]string `json:"errors,omitempty"`
 
-	Catalog          *datadog.ServiceCatalogEntry `json:"catalog,omitempty"`
-	Monitors         []datadog.MonitorSearchHit   `json:"monitors"`
-	SLOs             []datadog.SLO                `json:"slos"`
-	LogVolumeByStatus map[string]int              `json:"log_volume_by_status"`
-	ErrorLogs        []logJSONOut                 `json:"error_logs"`
-	ErrorSpans       []spanJSONOut                `json:"error_spans"`
-	Events           []eventJSONOut               `json:"events"`
-	DowntimesActive  []datadog.DowntimeData       `json:"downtimes_active"`
+	Catalog           *datadog.ServiceCatalogEntry `json:"catalog,omitempty"`
+	Monitors          []datadog.MonitorSearchHit   `json:"monitors"`
+	SLOs              []datadog.SLO                `json:"slos"`
+	LogVolumeByStatus map[string]int               `json:"log_volume_by_status"`
+	ErrorLogs         []logJSONOut                 `json:"error_logs"`
+	ErrorSpans        []spanJSONOut                `json:"error_spans"`
+	Events            []eventJSONOut               `json:"events"`
+	DowntimesActive   []datadog.DowntimeData       `json:"downtimes_active"`
 }
 
 var servicesContextCmd = &cobra.Command{

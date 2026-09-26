@@ -8,13 +8,13 @@ import (
 // --- Monitor CRUD ---
 
 type CreateMonitorRequest struct {
-	Name    string                 `json:"name"`
-	Type    string                 `json:"type"`
-	Query   string                 `json:"query"`
-	Message string                 `json:"message,omitempty"`
-	Tags    []string               `json:"tags,omitempty"`
-	Priority *int                  `json:"priority,omitempty"`
-	Options map[string]interface{} `json:"options,omitempty"`
+	Name     string                 `json:"name"`
+	Type     string                 `json:"type"`
+	Query    string                 `json:"query"`
+	Message  string                 `json:"message,omitempty"`
+	Tags     []string               `json:"tags,omitempty"`
+	Priority *int                   `json:"priority,omitempty"`
+	Options  map[string]interface{} `json:"options,omitempty"`
 }
 
 func (c *Client) CreateMonitor(req CreateMonitorRequest) (*Monitor, error) {
@@ -44,13 +44,13 @@ type CreateIncidentRequest struct {
 }
 
 type CreateIncidentData struct {
-	Type       string                    `json:"type"`
-	Attributes CreateIncidentAttributes  `json:"attributes"`
+	Type       string                   `json:"type"`
+	Attributes CreateIncidentAttributes `json:"attributes"`
 }
 
 type CreateIncidentAttributes struct {
-	Title            string `json:"title"`
-	CustomerImpacted bool   `json:"customer_impacted"`
+	Title            string          `json:"title"`
+	CustomerImpacted bool            `json:"customer_impacted"`
 	Fields           *IncidentFields `json:"fields,omitempty"`
 }
 
@@ -102,9 +102,9 @@ type UpdateIncidentRequest struct {
 }
 
 type UpdateIncidentData struct {
-	ID         string                    `json:"id"`
-	Type       string                    `json:"type"`
-	Attributes UpdateIncidentAttributes  `json:"attributes"`
+	ID         string                   `json:"id"`
+	Type       string                   `json:"type"`
+	Attributes UpdateIncidentAttributes `json:"attributes"`
 }
 
 type UpdateIncidentAttributes struct {

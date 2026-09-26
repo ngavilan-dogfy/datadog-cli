@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
 
 	"github.com/charmbracelet/bubbles/list"
 )

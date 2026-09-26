@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"datadog-cli/ui"
+	"github.com/ngavilan-dogfy/datadog-cli/ui"
 
 	"github.com/spf13/cobra"
 )
@@ -24,8 +24,8 @@ var tmplVarRe = regexp.MustCompile(`\$([a-zA-Z][a-zA-Z0-9_]*)`)
 var queryRefRe = regexp.MustCompile(`[a-zA-Z_][a-zA-Z0-9_]*`)
 
 var (
-	lintJSON      bool
-	lintShowOnly  string // "error" / "warning" / "info"
+	lintJSON        bool
+	lintShowOnly    string // "error" / "warning" / "info"
 	lintExitNonZero bool
 )
 

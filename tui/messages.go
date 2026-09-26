@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"datadog-cli/datadog"
+	"github.com/ngavilan-dogfy/datadog-cli/datadog"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
