@@ -29,9 +29,12 @@ type keyPrompt struct {
 // readClipboard is swappable in tests; errors mean "no clipboard here".
 var readClipboard = clipboard.ReadAll
 
-// tookFromClipboard remembers keys taken from the clipboard, to clear them
-// from it once they're saved.
-var tookFromClipboard []string
+// tookFromClipboard remembers secrets taken from the clipboard, to clear
+// them from it once they're saved; tookLabel says what they were.
+var (
+	tookFromClipboard []string
+	tookLabel         string
+)
 
 type clipMsg struct {
 	text string
@@ -123,7 +126,7 @@ func (m *keyModel) View() string {
 		b.WriteString("  " + bar + " " + wzOK.Render("●") + " Your clipboard holds what looks like " + article(m.p.Label) + " " + wzMuted.Render(maskKey(m.offered)) + " — enter tries it\n")
 	case m.watching:
 		frames := []string{"◐", "◓", "◑", "◒"}
-		b.WriteString("  " + bar + " " + wzAccent.Render(frames[m.frame%len(frames)]) + wzMuted.Render(" Watching your clipboard: click Copy on the key and I'll take it from there") + "\n")
+		b.WriteString("  " + bar + " " + wzAccent.Render(frames[m.frame%len(frames)]) + wzMuted.Render(" Watching your clipboard: click Copy on the "+m.p.Label+" and I'll take it from there") + "\n")
 	}
 	b.WriteString("  " + bar + " " + wzMuted.Render("enter confirm · esc cancel") + "\n")
 	return b.String()
@@ -170,6 +173,7 @@ func readKey(p keyPrompt) (string, error) {
 	}
 	if fm.fromClip {
 		tookFromClipboard = append(tookFromClipboard, fm.value)
+		tookLabel = p.Label
 		sayInfo("Took " + article(p.Label) + " from your clipboard " + wzMuted.Render(maskKey(fm.value)))
 	}
 	return fm.value, nil
@@ -189,7 +193,7 @@ func clearTakenKeys() {
 	for _, k := range tookFromClipboard {
 		if strings.Contains(strings.ToLower(cur), k) || strings.Contains(cur, k) {
 			if clipboard.WriteAll("") == nil {
-				sayInfo("Cleared the key from your clipboard")
+				sayInfo("Cleared the " + tookLabel + " from your clipboard")
 			}
 			return
 		}

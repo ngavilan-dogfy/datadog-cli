@@ -355,6 +355,7 @@ func (w *wizard) stepAPIKey() error {
 		openURL(page)
 		sayInfo("Opened " + page)
 	}
+	fmt.Println()
 	tried := map[string]bool{}
 	for {
 		if len(tried) > 0 {
@@ -442,6 +443,7 @@ func (w *wizard) stepAppKey() error {
 		openURL(page)
 		sayInfo("Opened " + page)
 	}
+	fmt.Println()
 	tried := map[string]bool{w.apiKey: true}
 	for {
 		if len(tried) > 1 {
