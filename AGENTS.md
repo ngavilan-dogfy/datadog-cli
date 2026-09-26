@@ -1,175 +1,149 @@
-# Agent guide — datadog-cli
+# AGENTS.md
 
-Guidance for AI agents (and scripts) using this CLI to gather Datadog context,
-plus notes for agents developing this repository.
+Guidance for AI agents: first for using the `datadog` CLI to investigate
+production, then for working on this repository. Claude Code users get the
+same playbooks as a skill with `datadog skill install`.
 
 ## Using the CLI
 
-### Discover capabilities
+### Ground rules
 
-```sh
-datadog schema                 # full command tree as JSON: commands, flags, defaults
-datadog schema logs --full     # one subtree, with full help text and examples
-```
+1. **Read freely; change nothing without an explicit yes.** Every command
+   that writes to Datadog is listed at the end of this section, and
+   `datadog schema` marks it `mutates: true`.
+2. **Prefer the commands that describe** (below) to raw series and log dumps.
+   They return facts you can quote, at a fraction of the size.
+3. **Use `--json` when you parse and `--md` when you reason**, and cut large
+   JSON with `jq`. Keep windows and limits deliberate.
+4. **Prove every claim** with the monitor id and state, the exact query, counts
+   with their window, and timestamps with their timezone.
 
-Every entry reports `json_output: true/false` so you know which commands can
-return structured data, and `mutates: true` on the ones that change Datadog.
+### Where to start
 
-### Read descriptions, not raw data
+| You have | Run |
+|---|---|
+| A Datadog link | `datadog read "<link>" --md` — keeps the link's window, variables and query |
+| A trace id | `datadog trace <id> --md` |
+| A service name | `datadog services context <service> --since 1h --json` |
+| A monitor id | `datadog monitors explain <id> --md` |
+| Nothing yet | `datadog triage --json` — the whole picture in one call |
 
-Raw series and log dumps are big and hard to reason about. These commands do
-the reading and hand you facts to quote (all take `--md` and `--json`):
-
-```sh
-datadog read "<any Datadog link>"                       # dashboard, monitor, trace, logs, APM service, metric…
-datadog metrics describe "p95:trace.http.request{service:api}" --since 6h --compare 1d
-#   service:api: ~120ms; rose to ~480ms at 09:38 (×4); peak 1.2s at 09:52; last 450ms · vs 1d before: ×3.1
-datadog logs patterns "service:api status:error" --since 1h --compare 1d
-#   ≈4,321  35%  api  error  new  Payment declined for customer <*>: <*>
-datadog trace <trace_id>                                # span tree, critical path, own time, N+1, errors, logs
-datadog dashboards read <id | link | --file x.json>     # every widget described + its problems (JSON paths)
-datadog monitors explain <id>                           # thresholds, who it wakes, what its data did
-datadog coverage                                        # per service: monitors, SLOs, owner, gaps + fixes
-datadog metrics tags <metric>                           # real tag keys/values and series count
-```
-
-Empty metric queries explain themselves when they can ("env:prod isn't a
-value of env for trace.x (it has: production)").
-
-### Designing dashboards and monitors
-
-1. Learn the data: `metrics search`, `metrics tags`, `metrics describe --since 7d`.
-2. Write the dashboard JSON (or `dashboards export <id> -o draft.json`).
-3. Validate against real data: `datadog dashboards read --file draft.json --problems`.
-4. The user previews it: `datadog ui --file draft.json` reloads on every save.
-5. After a yes: `datadog dashboards create --file draft.json`.
-
-### Anything else: the raw API
-
-`datadog api <path>` calls any endpoint with the profile's keys (like
-`gh api`): `-q k=v` query params, `-F k=v` typed JSON fields (`a.b=1` nests),
-`--input file`. GETs and searches run straight away; other methods ask to
-confirm (or `--yes`), and read-only profiles refuse them.
-
-### Gather context (start here)
-
-`datadog triage` is the one-call context snapshot. Prefer it over stitching
-together multiple commands:
-
-```sh
-datadog triage --json                          # last hour, whole org
-datadog triage --since 15m --json              # tighter window
-datadog triage --service api --env prod --json # scoped to a service
-datadog triage --around 1747632000 --window 20m --json  # centered on an alert timestamp
-```
-
-The JSON has this shape:
+`triage` fetches alerting monitors (with query and message), open incidents,
+SLOs at risk, error logs, events, audit-trail changes, security signals, CI
+runs, active downtimes and host counts concurrently:
 
 ```json
 {
-  "generated_at": "...", "site": "...",
-  "window": {"from": "...", "to": "..."},
-  "summary": {"monitors_alerting": 2, "incidents_open": 0, "error_logs": 5,
-              "audit_changes": 1, "hosts_up": 11, "hosts_total": 12, ...},
-  "errors": {"pipelines": "CI Visibility not enabled ..."},
-  "monitors_alerting": [...], "incidents_open": [...], "slos_at_risk": [...],
-  "events": [...], "error_logs": [...], "audit_changes": [...],
-  "security_signals": {...}, "pipelines": [...], "downtimes_active": [...],
-  "host_totals": {"total_up": 11, "total_active": 12}
+  "window": {"from": "…", "to": "…"},
+  "summary": {"monitors_alerting": 2, "incidents_open": 0, "error_logs": 5, "audit_changes": 1, "hosts_up": 11, "hosts_total": 12},
+  "errors": {"pipelines": "CI Visibility not enabled …"},
+  "monitors_alerting": [], "incidents_open": [], "slos_at_risk": [], "events": [],
+  "error_logs": [], "audit_changes": [], "security_signals": {}, "pipelines": [], "downtimes_active": []
 }
 ```
 
-Read `summary` first to decide where to drill down. `errors` lists sections
-that failed (missing permissions, product not enabled) — the rest of the
-snapshot is still valid. Check `downtimes_active` before concluding an alert
-is being ignored: it may be muted on purpose. `audit_changes` tells you who
-changed configuration in the window — an alert right after a monitor edit or
-a deleted downtime usually isn't a coincidence. Alerting monitors come
-enriched with their `query` and `message` (top 10). Compare `hosts_up` vs
-`hosts_total` to spot machines that dropped off.
+Read `summary` first. `errors` lists the sections that failed (a missing
+permission, a product not enabled); the rest is still valid. Check
+`downtimes_active` before concluding that an alert is being ignored, and
+`audit_changes` for who changed what: an alert right after a monitor edit is
+rarely a coincidence.
 
-### Investigate one service
-
-When the question is about a specific service, `services context` returns
-the full dossier in one call:
+### Read descriptions, not raw data
 
 ```sh
-datadog services context api --since 2h --json
+datadog read "<any Datadog link>"
+datadog metrics describe "p95:trace.http.request{service:api}" --since 6h --compare 1d
+#   service:api: ~120ms; rose to ~480ms at 09:38 (×4); peak 1.2s at 09:52; last 450ms · vs 1d before: ×3.1
+datadog logs patterns "service:api status:error" --since 1h --compare 1d
+#   4,321  35.0%  new  api  error  09:58  TimeoutError: payments.authorize timed out after <num>ms
+datadog trace <trace_id>                                # span tree, critical path, own time, N+1, errors, logs
+datadog dashboards read <id | link | --file x.json>     # every widget described, and its problems
+datadog monitors explain <id>                           # thresholds, who it wakes, what its data did
+datadog coverage                                        # per service: monitors, SLOs, owner, gaps and fixes
+datadog metrics tags <metric>                           # the tag keys and values that exist
 ```
 
-It includes: Service Catalog entry (team/tier/links), all monitors tagged
-with the service, SLOs, **log volume by status** (`{"error": 664, "info":
-12379, "warn": 833}` — is the error rate abnormal?), recent error logs,
-error spans from APM (failing endpoints with durations and trace IDs),
-events and active downtimes. Same `summary`/`errors` conventions as triage.
+An empty metric query says why when it can (*env:prod isn't a value of env
+for trace.x (it has: production)*); `metrics tags` shows the real values.
+Traces can be partial when sampling dropped a parent span — the report says
+so. `logs patterns` estimates counts from a sample when a window holds more
+than a thousand logs.
 
 ### Drill down
 
 ```sh
-datadog logs "service:api status:error" --since 2h --json   # includes tags + attributes
-datadog logs "service:api" --all --jsonl                    # paginate everything (cap 5000), NDJSON
-datadog audit --since 24h --json                            # who changed what (config changes)
-datadog monitors show <id> --json
-datadog incidents show <id> --json
-datadog correlate --around <spike-ts> --window 10m --json   # events/incidents/security near a timestamp
-datadog metrics meta system.cpu.user --json                 # unit/type before interpreting numbers
-datadog metrics query "avg:system.cpu.user{service:api}" --json
-datadog logs aggregate "service:api" --groupby status --json
+datadog logs "service:api status:error" --since 2h --limit 50 --json
+datadog logs aggregate "service:api status:error" --groupby @http.status_code --minutes 60 --json
+datadog metrics query "avg:system.cpu.user{service:api} by {host}" --since 4h --json
+datadog metrics meta <metric> --json          # unit and type before interpreting numbers
+datadog correlate --around <time> --window 20m --json
+datadog audit --since 24h --query "@evt.name:Monitor" --json
+datadog incidents show <id> --json · datadog slos show <id> --json
 ```
 
-Audit query tips: `-@asset.type:datadog_agent_configuration` drops periodic
-agent-config noise; `@evt.name:Monitor` narrows to monitor changes;
-`@usr.email:x@y.com` narrows to one author.
+In `audit` queries, `-@asset.type:datadog_agent_configuration` hides the
+agents' periodic configuration noise and `@usr.email:<email>` narrows to one
+person's changes.
+
+### Designing dashboards and monitors
+
+1. Learn the data: `metrics search`, `metrics tags`, `metrics describe --since 7d`.
+   Pick thresholds from what the data does, not from a guess.
+2. Write the dashboard JSON, or start from `dashboards export <id> -o draft.json`.
+3. Validate it against real data: `datadog dashboards read --file draft.json --problems`.
+4. Let the user watch it: `datadog ui --file draft.json` reloads on every save.
+5. Only after a yes: `datadog dashboards create --file draft.json`.
+
+### The raw API
+
+`datadog api <path>` calls any endpoint with the profile's keys, like
+`gh api`: `-q k=v` for query parameters, `-F k=v` for typed JSON fields
+(`a.b=1` nests), `--input file` for a body. GETs, searches and queries run
+immediately; any other request asks for confirmation (`--yes` skips it) and
+is refused by read-only profiles.
 
 ### Conventions you can rely on
 
-- `--json` → structured JSON on stdout, nothing else on stdout.
-- On error with `--json`, stderr carries one parseable line: `{"error":"..."}`.
-  Exit code 0 = success, 1 = any failure.
-- Piped output without `--json` is TSV with a header row.
-- Timestamps: RFC3339 (`2026-05-19T04:54:00Z`) or epoch seconds/millis both
-  accepted by `--from/--to/--around`.
-- Durations: `30m`, `2h`, `1d` accepted by `--since`, `--window`, `--duration`.
-- The client retries 429 (waiting for `X-RateLimit-Reset`) and 5xx
-  automatically — do not implement retries on top. Log search is limited to
-  ~3 calls per 10 s: prefer `logs patterns` / `logs aggregate` to paging.
-- Read-only profiles (`read_only: true`, or `DATADOG_READ_ONLY=1`) refuse
-  every mutating command.
+- stdout carries data only: JSON with `--json`, TSV with a header row when
+  piped, tables in a terminal.
+- Failures exit 1 and go to stderr; with `--json`, stderr also gets one
+  parseable line, `{"error":"..."}`.
+- `--from`, `--to` and `--around` take RFC3339 or epoch seconds/milliseconds;
+  `--since` and `--window` take durations (`30m`, `2h`, `1d`).
+- The client retries 429 and 5xx, waiting for Datadog's rate-limit window.
+  Don't add retries. Log search allows about three calls per ten seconds.
+- JSON field names are stable: renaming one is a breaking change.
 
-### Mutating commands — ask before running
+### Commands that change Datadog — ask first
 
-`monitors mute/unmute/create/edit/import/delete`, `hosts mute/unmute`,
-`downtimes schedule/cancel`, `incidents create/update`, `events post`,
-`deploy`, `dashboards create/clone/import/delete`, `batch mute/unmute`,
-`synthetics trigger`, `tags add/set/rm`, `integrations … set/clear`, and
-`api` with any method but GET. `datadog schema` marks them `mutates: true`.
-Everything else is read-only.
+`monitors mute/unmute/create/edit/import/delete`, `batch mute/unmute`,
+`downtimes schedule/cancel`, `hosts mute/unmute`,
+`dashboards create/clone/import/delete`, `incidents create/update`,
+`events post`, `deploy`, `synthetics trigger`, `tags add/set/rm`,
+`integrations … set/clear`, and `api` requests that write. Profiles with
+`read_only: true`, and sessions with `DATADOG_READ_ONLY=1`, refuse them all.
 
-## Developing this repo
+## Working on this repository
 
-- Go 1.25. Commands in `cmd/` (Cobra, one file per area, each registers
-  itself in `init()`; flags are package-level vars prefixed with the command
-  name). `cmd/datadog/main.go` is the entry point.
-- `datadog/` is a hand-rolled HTTP client (no official SDK). Types in
-  `datadog/types*.go` model the *real* responses: check shapes against the
-  live API, the docs have drifted before.
-- `tui/` is `datadog ui` (Bubble Tea); `tui/report.go` reads a dashboard
-  into text for `dashboards read`; `viz/` draws charts, sparklines and
-  big numbers; `internal/series` describes a time series in words;
-  `internal/logpattern` folds log messages into patterns; `internal/demo/` is the made-up org behind `ui --demo`;
-  `internal/selfupdate/` is `update` and the update notice (kept identical
-  across the ngavilan-dogfy CLIs); `internal/uiprefs/` remembers the chart
-  style.
-- Every list/show command implements the trio: TTY table, TSV (piped or
-  `--plain`), `--json`. `cmd/logs.go` is the reference.
-- Commands that work without credentials go in the list in `needsAuth`
-  (`cmd/root.go`).
-- The UI is tested against a fake Datadog (`tui/fakedd_test.go`): the
-  harness types keys and checks that every frame is exactly the terminal's
-  size. `internal/demo` has its own test that every monitor's state matches
-  its data. Look at the real thing with `datadog ui --demo`.
-- `make check` (vet + test + build) before committing. Smoke-test read-only
-  commands against the real API when you have credentials; never run
-  mutating commands against a real org to test.
-- Commits follow Conventional Commits: they decide the next version and
-  become the release notes (see CONTRIBUTING.md).
+Read [ARCHITECTURE.md](ARCHITECTURE.md) first: it maps the code and explains
+the decisions behind it. [CONTRIBUTING.md](CONTRIBUTING.md) covers the
+workflow and releases. The rules that matter most:
+
+- **`make check`** (vet, tests, build) before every commit.
+- **Every command speaks the output contract**: styled output in a terminal,
+  TSV when piped (or with `--plain`), JSON with `--json`. `cmd/logs.go` is
+  the reference. JSON field names are public; don't rename them.
+- **A new command that writes** goes in `mutatingCommands` (`cmd/readonly.go`)
+  so read-only profiles refuse it and `schema` marks it. A command that works
+  without credentials goes in `needsAuth` (`cmd/root.go`).
+- **Types model the real API.** Check response shapes against a live
+  organization; the public docs have drifted before.
+- **Never touch a real organization's data in tests**, and never run a
+  mutating command against one to try something. Screenshots come from
+  `datadog ui --demo`; examples use made-up services and ids.
+- **Keep the skill current.** When commands or flags change, update
+  `cmd/skill_data/SKILL.md` and its copy in `.claude/skills/datadog/` (a test
+  checks they match).
+- **Shared files** — `internal/selfupdate/` and `cmd/keyinput.go` also live in
+  the other ngavilan-dogfy CLIs; port changes to them.
+- **Conventional commits**: the subject becomes a line in the release notes.
