@@ -24,15 +24,17 @@ datadog ui
 
 No keys at hand? `datadog ui --demo` opens a made-up web store whose checkout is having a bad afternoon, so you can look around first. Nothing leaves your machine.
 
-The installer picks the build for your computer, checks it against the release's checksums, puts it in `~/.local/bin` (no sudo), offers to add that folder to your `PATH`, and offers to run `datadog setup`. Run it again any time: it updates in place.
+The installer picks the build for your computer, checks it against the release's checksums, puts it in `~/.local/bin` (no sudo), offers to add that folder to your `PATH`, to teach Claude Code this CLI if you use it, and to run `datadog setup`. Run it again any time: it updates in place.
 
-`datadog setup` asks for three things and checks each one against Datadog before going on:
+`datadog setup` walks you through three things and checks each one against Datadog before going on:
 
 1. **Site**: pick yours from the list, or paste any link from your Datadog (a dashboard, a monitor) and the site is taken from it.
-2. **API key**: *Organization Settings → API Keys*. A key that belongs to another site is caught, and setup tells you which site it is.
-3. **Application key**: *Organization Settings → Application Keys*. Setup says whose key it is and what it can read: monitors, dashboards, metrics, logs, incidents, SLOs.
+2. **API key**: setup opens the right page of Datadog and says what to click. Click **Copy** on a key and setup takes it from your clipboard: no pasting. A key from another site is caught, and setup tells you which site it is. Can't create keys? It tells you what to ask an admin for.
+3. **Application key**: the same, on your personal settings, where anyone can create one. Setup says whose key it is and what it can read: monitors, dashboards, metrics, logs, incidents, SLOs.
 
-Keys stay on your machine, in `~/.config/datadog-cli/profiles/` with owner-only permissions. `datadog doctor` checks everything again whenever something looks off, with a fix for each problem it finds.
+Then two choices: whether this CLI may change things in Datadog (mute monitors, create dashboards) or only read, which is the safest for AI agents; and, if you use Claude Code, the `/datadog` skill.
+
+Keys stay on your machine, in `~/.config/datadog-cli/profiles/` with owner-only permissions, and setup clears them from the clipboard once they're saved. `datadog doctor` checks everything again whenever something looks off, with a fix for each problem it finds.
 
 In CI or containers there's nothing to set up: `DD_API_KEY`, `DD_APP_KEY` and `DD_SITE` are enough.
 
@@ -155,7 +157,7 @@ It shows what's new, downloads the release for your machine, checks its checksum
 <details>
 <summary><strong>Other ways to install</strong></summary>
 
-- **A specific version or folder**: `curl -fsSL …/install.sh | DATADOG_VERSION=v1.2.0 DATADOG_INSTALL_DIR=~/bin sh` (`DATADOG_NO_SETUP=1` and `DATADOG_NO_MODIFY_PATH=1` keep it from asking).
+- **A specific version or folder**: `curl -fsSL …/install.sh | DATADOG_VERSION=v1.2.0 DATADOG_INSTALL_DIR=~/bin sh` (`DATADOG_NO_SETUP=1`, `DATADOG_NO_SKILL=1` and `DATADOG_NO_MODIFY_PATH=1` keep it from asking).
 - **With Go**: `go install github.com/ngavilan-dogfy/datadog-cli/cmd/datadog@latest`
 - **By hand**: download `datadog-<os>-<arch>` from the [latest release](https://github.com/ngavilan-dogfy/datadog-cli/releases/latest), check it against `checksums.txt`, make it executable and put it in your `PATH`. Windows: `datadog-windows-amd64.exe`.
 - **From source**: `make install` builds and copies to `~/.local/bin`.

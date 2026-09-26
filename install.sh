@@ -9,6 +9,7 @@
 #   DATADOG_INSTALL_DIR=~/bin   where to put datadog (default: ~/.local/bin)
 #   DATADOG_VERSION=v1.2.0      a specific release (default: the latest)
 #   DATADOG_NO_SETUP=1          don't offer to run 'datadog setup' at the end
+#   DATADOG_NO_SKILL=1          don't offer the Claude Code skill
 #   DATADOG_NO_MODIFY_PATH=1    never touch your shell's config file
 #
 # Nothing here needs sudo. Run it again any time to update.
@@ -269,8 +270,19 @@ main() {
 	fi
 
 	printf '\n'
-	if [ -d "$HOME/.claude" ] && [ ! -f "$HOME/.claude/skills/datadog/SKILL.md" ]; then
-		info "Using Claude Code? ${B}datadog skill install${R} teaches it this CLI (/datadog)."
+	# Claude Code users get the skill offered: it teaches Claude this CLI.
+	if [ ! -f "$HOME/.claude/skills/datadog/SKILL.md" ] && { [ -d "$HOME/.claude" ] || command -v claude >/dev/null 2>&1; }; then
+		if [ -z "${DATADOG_NO_SKILL:-}" ] && can_ask && ask "You use Claude Code: teach it this CLI? (installs the /datadog skill)"; then
+			if "$INSTALL_DIR/datadog" skill install --quiet >/dev/null 2>&1; then
+				ok "Claude Code skill installed: ask Claude about alerts, a slow service or a Datadog link"
+			else
+				warn "Couldn't install the Claude Code skill"
+				hint "Run: datadog skill install"
+			fi
+			printf '\n'
+		else
+			info "Using Claude Code? ${B}datadog skill install${R} teaches it this CLI (/datadog)."
+		fi
 	fi
 	if [ -n "$previous" ] && configured; then
 		say "${OK}Done.${R} Your settings are untouched. ${DIM}What's new: $RELEASES${R}"

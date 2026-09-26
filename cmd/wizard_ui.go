@@ -69,6 +69,14 @@ func stepHeader(n, total int, title, subtitle string) {
 	fmt.Println()
 }
 
+// printSteps prints numbered instructions that stay on screen while the
+// user follows them in the browser.
+func printSteps(steps ...string) {
+	for i, st := range steps {
+		fmt.Printf("  %s %s\n", wzAccent.Render(fmt.Sprintf("%d.", i+1)), st)
+	}
+}
+
 func sayOK(msg string)   { fmt.Println("  " + wzOK.Render("●") + " " + msg) }
 func sayInfo(msg string) { fmt.Println("  " + wzMuted.Render("·") + " " + msg) }
 

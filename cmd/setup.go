@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strings"
@@ -40,7 +41,10 @@ the defaults, so you only change what you want.
   Step 1  Your Datadog site     the region your organization lives in
   Step 2  API key               identifies your organization
   Step 3  Application key       acts as you, with your permissions
-  Step 4  Extras (optional)     chart style, Claude Code for investigations
+  Step 4  Extras                chart style, read-only or not, the Claude Code skill
+
+In steps 2 and 3 you don't have to paste: click Copy on the key in
+Datadog and setup takes it from your clipboard (and clears it after saving).
 
 Settings are saved in ~/.config/datadog-cli/ (only readable by you).
 
@@ -336,40 +340,39 @@ func (w *wizard) stepAPIKey() error {
 	page := app + "/organization-settings/api-keys"
 	stepHeader(2, setupSteps, "API key",
 		"The API key identifies your organization to Datadog.")
+	printSteps(
+		"Your browser opens "+wzBold.Render(strings.TrimPrefix(page, "https://")),
+		"Click a key you can use, or "+wzBold.Render("+ New Key")+" and call it "+wzBold.Render(keyName()),
+		"Click "+wzBold.Render("Copy")+" on the key: setup picks it up from your clipboard",
+	)
+	printFix("Can't see or create API keys? That takes Datadog admin rights: ask an admin for one.\nAny key of your organization works; this CLI only reads with it unless you allow changes.")
+	fmt.Println()
 	open := true
-	if err := ask(
-		huh.NewNote().Title("Get an API key").Description(
-			"1. Your browser opens "+strings.TrimPrefix(page, "https://")+"\n"+
-				"2. Click an existing key, or \"New Key\" (name it datadog-cli)\n"+
-				"3. Copy the key and paste it on the next screen"),
-		huh.NewConfirm().Title("Open that page now?").Affirmative("Yes, open it").Negative("I already have one").Value(&open),
-	); err != nil {
+	if err := ask(huh.NewConfirm().Title("Open that page now?").Affirmative("Yes, open it").Negative("I already have one").Value(&open)); err != nil {
 		return err
 	}
 	if open {
 		openURL(page)
 		sayInfo("Opened " + page)
 	}
+	tried := map[string]bool{}
 	for {
-		key := ""
-		if err := ask(huh.NewInput().Title("Paste your API key").
-			Description("Hidden while you type. It's saved only on this machine.").
-			EchoMode(huh.EchoModePassword).Value(&key).
-			Validate(func(s string) error {
-				if cleanKey(s) == "" {
-					return fmt.Errorf("paste the key you copied")
-				}
-				return nil
-			})); err != nil {
+		if len(tried) > 0 {
+			fmt.Println()
+		}
+		key, err := readKey(keyPrompt{Title: "Your API key", Label: "API key",
+			Hint:  "32 characters. Hidden while you type, saved only on this machine.",
+			Clean: cleanKey, Match: reAPIKey.MatchString, Skip: tried})
+		if err != nil {
 			return err
 		}
-		key = cleanKey(key)
+		tried[key] = true
 		if hint := keyShapeHint(key, true); hint != "" && reAppKey.MatchString(key) {
 			sayFail("That isn't an API key", hint)
 			continue
 		}
 		var ok bool
-		err := withSpinner("Checking the key with "+w.site, func() error { var e error; ok, e = validateAPIKey(w.site, key); return e })
+		err = withSpinner("Checking the key with "+w.site, func() error { var e error; ok, e = validateAPIKey(w.site, key); return e })
 		if err != nil {
 			sayFail("Couldn't check the key: "+rootCause(err), "Check your connection or VPN and try again.")
 			continue
@@ -424,34 +427,33 @@ func (w *wizard) stepAppKey() error {
 	page := app + "/personal-settings/application-keys"
 	stepHeader(3, setupSteps, "Application key",
 		"The application key lets the CLI act as you: it sees exactly what you can see.")
+	printSteps(
+		"Your browser opens "+wzBold.Render(strings.TrimPrefix(page, "https://"))+wzMuted.Render(" (anyone can create one)"),
+		"Click "+wzBold.Render("+ New Key")+" and call it "+wzBold.Render(keyName()),
+		"Leave the scopes empty (it reads what you can see) and create it",
+		"Click "+wzBold.Render("Copy")+" — it's shown only once — setup picks it up from your clipboard",
+	)
+	fmt.Println()
 	open := true
-	if err := ask(
-		huh.NewNote().Title("Create an application key").Description(
-			"1. Your browser opens "+strings.TrimPrefix(page, "https://")+"\n"+
-				"2. Click \"New Key\", name it datadog-cli\n"+
-				"3. Leave scopes empty (full read access), create it and copy it — it's shown only once"),
-		huh.NewConfirm().Title("Open that page now?").Affirmative("Yes, open it").Negative("I already have one").Value(&open),
-	); err != nil {
+	if err := ask(huh.NewConfirm().Title("Open that page now?").Affirmative("Yes, open it").Negative("I already have one").Value(&open)); err != nil {
 		return err
 	}
 	if open {
 		openURL(page)
 		sayInfo("Opened " + page)
 	}
+	tried := map[string]bool{w.apiKey: true}
 	for {
-		key := ""
-		if err := ask(huh.NewInput().Title("Paste your application key").
-			Description("Hidden while you type. It's saved only on this machine.").
-			EchoMode(huh.EchoModePassword).Value(&key).
-			Validate(func(s string) error {
-				if cleanKey(s) == "" {
-					return fmt.Errorf("paste the key you copied")
-				}
-				return nil
-			})); err != nil {
+		if len(tried) > 1 {
+			fmt.Println()
+		}
+		key, err := readKey(keyPrompt{Title: "Your application key", Label: "application key",
+			Hint:  "40 characters. Hidden while you type, saved only on this machine.",
+			Clean: cleanKey, Match: reAppKey.MatchString, Skip: tried})
+		if err != nil {
 			return err
 		}
-		key = cleanKey(key)
+		tried[key] = true
 		if key == w.apiKey {
 			sayFail("That's the API key again", "The application key is a different one, created under Personal Settings.")
 			continue
@@ -461,7 +463,7 @@ func (w *wizard) stepAppKey() error {
 			p.MaxResults = w.existing.MaxResults
 		}
 		var id identity
-		err := withSpinner("Checking the application key", func() error { var e error; id, e = whoAmI(p); return e })
+		err = withSpinner("Checking the application key", func() error { var e error; id, e = whoAmI(p); return e })
 		if err == nil {
 			who := id.name
 			if who == "" {
@@ -512,14 +514,29 @@ func (w *wizard) save() error {
 		return err
 	}
 	sayOK("Saved to " + tildePath(config.ProfileDir()+"/"+w.profile+".yaml") + wzMuted.Render(" (only readable by you)"))
+	clearTakenKeys()
 	return nil
+}
+
+// keyName is what to call the keys in Datadog, so whoever reviews them
+// later knows where they're used.
+func keyName() string {
+	host, _ := os.Hostname()
+	host = strings.TrimSuffix(strings.TrimSuffix(host, ".local"), ".lan")
+	if i := strings.IndexByte(host, '.'); i > 0 {
+		host = host[:i]
+	}
+	if host == "" {
+		return "datadog-cli"
+	}
+	return "datadog-cli · " + strings.ToLower(host)
 }
 
 // ─── step 4: extras ──────────────────────────────────────────────
 
 func (w *wizard) stepExtras() error {
 	stepHeader(4, setupSteps, "Extras (optional)",
-		"How charts are drawn in datadog ui, and Claude Code for investigating alerts.")
+		"How charts are drawn, whether this CLI may change things, and Claude Code.")
 	style := uiprefs.ChartStyle()
 	fmt.Println("  " + wzMuted.Render("A. braille — finer, needs a font with braille"))
 	for _, l := range viz.Sample(viz.Braille, 44, 4) {
@@ -540,9 +557,76 @@ func (w *wizard) stepExtras() error {
 	if err := uiprefs.SetChartStyle(style); err == nil {
 		sayOK("Charts: " + style)
 	}
-	for _, c := range extraChecks() {
-		printCheck(c)
+
+	fmt.Println()
+	mode := "write"
+	if w.p.ReadOnly {
+		mode = "read"
 	}
+	if err := ask(huh.NewSelect[string]().
+		Title("May this CLI change things in Datadog?").
+		Description("Reading is always on. You can change this later: read_only in "+tildePath(config.ProfileDir()+"/"+w.profile+".yaml")).
+		Options(
+			huh.NewOption("Yes: mute monitors, create dashboards and monitors (agents ask you first)", "write"),
+			huh.NewOption("No, read-only: every change is refused — the safest for AI agents", "read"),
+		).Value(&mode)); err != nil {
+		return err
+	}
+	if ro := mode == "read"; ro != w.p.ReadOnly {
+		w.p.ReadOnly = ro
+		if err := config.Save(w.p); err != nil {
+			return fmt.Errorf("couldn't save your settings: %w", err)
+		}
+	}
+	if w.p.ReadOnly {
+		sayOK("Read-only: nothing in Datadog can be changed from this profile")
+	} else {
+		sayOK("Read and write " + wzMuted.Render("(DATADOG_READ_ONLY=1 makes a single session read-only)"))
+	}
+
+	if _, err := lookTool("claude"); err == nil {
+		if err := offerSkill(); err != nil {
+			return err
+		}
+	}
+	for _, c := range extraChecks() {
+		if c.Name == "terminal" || (c.Name == "claude" && c.Status != "ok") {
+			printCheck(c)
+		}
+	}
+	return nil
+}
+
+// offerSkill installs (or refreshes) the /datadog skill for Claude Code,
+// if the user wants it.
+func offerSkill() error {
+	dest, err := skillPath()
+	if err != nil {
+		return nil
+	}
+	current, _ := os.ReadFile(dest)
+	if string(current) == string(skillMD) {
+		sayOK("Claude Code knows this CLI " + wzMuted.Render("(/datadog skill installed)"))
+		return nil
+	}
+	yes := true
+	title := "Teach Claude Code to use this CLI? (/datadog skill)"
+	if len(current) > 0 {
+		title = "Refresh the /datadog skill for Claude Code to this version?"
+	}
+	fmt.Println()
+	if err := ask(huh.NewConfirm().Title(title).
+		Description("Then ask Claude about alerts, a slow service, a trace or a dashboard link,\nand it investigates with these commands — asking before it changes anything.").
+		Affirmative("Yes").Negative("No").Value(&yes)); err != nil || !yes {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(dest, skillMD, 0o644); err != nil {
+		return err
+	}
+	sayOK("Claude Code skill installed " + wzMuted.Render(tildePath(dest)))
 	return nil
 }
 
@@ -569,13 +653,18 @@ func (w *wizard) done() error {
 		return nil
 	}
 	fmt.Println("  Try these:")
-	for _, c := range [][2]string{
+	tries := [][2]string{
 		{"datadog status", "what's alerting right now"},
 		{"datadog ui", "dashboards, monitors and logs in your terminal (? for help)"},
+		{"datadog coverage", "which services have no monitors, and the ones to add"},
 		{"datadog doctor", "check that everything works"},
 		{"datadog --help", "every command"},
-	} {
-		fmt.Printf("    %s %s\n", cmdHint(fmt.Sprintf("%-15s", c[0])), wzMuted.Render(c[1]))
+	}
+	if skillInstalled() {
+		tries = append(tries, [2]string{"/datadog", "in Claude Code: \"why is api slow since 10:00?\""})
+	}
+	for _, c := range tries {
+		fmt.Printf("    %s %s\n", cmdHint(fmt.Sprintf("%-16s", c[0])), wzMuted.Render(c[1]))
 	}
 	fmt.Println()
 	open := true
