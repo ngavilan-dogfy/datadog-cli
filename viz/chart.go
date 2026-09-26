@@ -135,6 +135,26 @@ func buckets(s Series, from, to int64, n int) []float64 {
 	return out
 }
 
+// spanSteps lets each point of an area or bar chart cover its whole
+// interval: with a little less than one point per column, some columns get
+// none and would show as regular gaps. Real gaps (missing points) stay.
+func spanSteps(vals []float64, s Series, from, to int64) {
+	n := len(vals)
+	reach := gapLimit(s, from, to, n) * 2 / 5 // gapLimit is 2.5 steps
+	if reach < 1 {
+		return
+	}
+	last, lastAt := math.NaN(), -n
+	for i, v := range vals {
+		switch {
+		case !math.IsNaN(v):
+			last, lastAt = v, i
+		case i-lastAt <= reach:
+			vals[i] = last
+		}
+	}
+}
+
 // gapLimit is how many empty columns a line may bridge: sparse metrics
 // report less often than the chart has columns, and those must connect.
 func gapLimit(s Series, from, to int64, n int) int {
@@ -172,6 +192,9 @@ func (c Chart) layout() (layout, [][]float64) {
 		vals = make([][]float64, len(c.Series))
 		for i, s := range c.Series {
 			vals[i] = buckets(s, from, to, max(1, width*sub))
+			if c.Kind != Line {
+				spanSteps(vals[i], s, from, to)
+			}
 		}
 		lo, hi := c.valueRange(vals, from, to)
 		c.fitTicks(&l, lo, hi)

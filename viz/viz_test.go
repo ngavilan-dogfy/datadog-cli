@@ -178,3 +178,27 @@ func TestSparklineStretchesFewPoints(t *testing.T) {
 		t.Fatalf("a missing point should stay a gap: %q", gap)
 	}
 }
+
+// With a little less than one point per column, bars must still touch:
+// each point covers its interval.
+func TestBarsCoverTheirInterval(t *testing.T) {
+	var pts []Point
+	for i := 0; i < 50; i++ {
+		pts = append(pts, Point{T: int64(i) * 60000, V: 10})
+	}
+	c := Chart{Width: 60, Height: 4, Kind: Bars, Series: []Series{{Name: "a", Points: pts}}, NoXAxis: true, NoYAxis: true}
+	rows := c.Render()
+	bottom := strings.TrimRight(ansi.Strip(rows[len(rows)-1]), " ")
+	if strings.Contains(strings.TrimLeft(bottom, " "), " ") {
+		t.Fatalf("gaps between bars: %q", bottom)
+	}
+	// A real hole in the data stays a hole.
+	pts[25].V = math.NaN()
+	pts[26].V = math.NaN()
+	pts[27].V = math.NaN()
+	c.Series[0].Points = pts
+	rows = c.Render()
+	if bottom := strings.TrimSpace(ansi.Strip(rows[len(rows)-1])); !strings.Contains(bottom, " ") {
+		t.Fatalf("missing points should leave a gap: %q", bottom)
+	}
+}
