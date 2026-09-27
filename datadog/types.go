@@ -47,6 +47,15 @@ type MonitorOptions struct {
 	NotifyAudit   bool                   `json:"notify_audit"`
 	TimeoutH      *int                   `json:"timeout_h"`
 	EscalationMsg string                 `json:"escalation_message"`
+	// How it notifies and evaluates: minutes between reminders while it
+	// stays alerting, seconds of delay before evaluating (for metrics that
+	// arrive late), minutes without data before No Data.
+	RenotifyInterval  *int   `json:"renotify_interval,omitempty"`
+	EvaluationDelay   *int   `json:"evaluation_delay,omitempty"`
+	NoDataTimeframe   *int   `json:"no_data_timeframe,omitempty"`
+	NewGroupDelay     *int   `json:"new_group_delay,omitempty"`
+	RequireFullWindow *bool  `json:"require_full_window,omitempty"`
+	OnMissingData     string `json:"on_missing_data,omitempty"`
 }
 
 type MatchingDowntime struct {

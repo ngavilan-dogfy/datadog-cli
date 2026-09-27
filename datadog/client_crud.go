@@ -37,6 +37,25 @@ func (c *Client) UpdateMonitor(id int64, fields map[string]interface{}) error {
 	return err
 }
 
+// MonitorOptionsRaw returns a monitor's options as Datadog stores them,
+// every field included: to change some and send them all back.
+func (c *Client) MonitorOptionsRaw(id int64) (map[string]interface{}, error) {
+	data, err := c.do("GET", fmt.Sprintf("/api/v1/monitor/%d", id), nil)
+	if err != nil {
+		return nil, err
+	}
+	var m struct {
+		Options map[string]interface{} `json:"options"`
+	}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return nil, err
+	}
+	if m.Options == nil {
+		m.Options = map[string]interface{}{}
+	}
+	return m.Options, nil
+}
+
 // --- Incident CRUD ---
 
 type CreateIncidentRequest struct {

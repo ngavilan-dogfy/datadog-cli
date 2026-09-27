@@ -213,7 +213,13 @@ Examples:
   datadog monitors edit 12345 --name "New name"
   datadog monitors edit 12345 --query "avg(last_5m):avg:system.cpu.user{*} > 95"
   datadog monitors edit 12345 --message "@slack-alerts" --priority 1
-  datadog monitors edit 12345 --tags "env:prod,team:platform"`,
+  datadog monitors edit 12345 --tags "env:prod,team:platform"
+  datadog monitors edit 12345 --option renotify_interval=60 --option evaluation_delay=300
+  datadog monitors edit 12345 --threshold critical=0.05 --threshold critical_recovery=0.03
+
+--option and --threshold change one option or threshold and keep the rest
+(values are read as JSON when they can be: 60, true, null). 'datadog monitors
+review' writes these commands for you.`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		id, err := strconv.ParseInt(args[0], 10, 64)
@@ -238,9 +244,29 @@ Examples:
 		if cmd.Flags().Changed("priority") {
 			fields["priority"] = editMonPriority
 		}
+		if len(editMonOptions) > 0 || len(editMonThresholds) > 0 {
+			opts, err := client.MonitorOptionsRaw(id)
+			if err != nil {
+				return err
+			}
+			if err := applySettings(opts, editMonOptions); err != nil {
+				return fmt.Errorf("--option: %w", err)
+			}
+			if len(editMonThresholds) > 0 {
+				th, _ := opts["thresholds"].(map[string]interface{})
+				if th == nil {
+					th = map[string]interface{}{}
+				}
+				if err := applySettings(th, editMonThresholds); err != nil {
+					return fmt.Errorf("--threshold: %w", err)
+				}
+				opts["thresholds"] = th
+			}
+			fields["options"] = opts
+		}
 
 		if len(fields) == 0 {
-			return fmt.Errorf("no fields to update — use --name, --query, --message, --tags, or --priority")
+			return fmt.Errorf("no fields to update — use --name, --query, --message, --tags, --priority, --option or --threshold")
 		}
 
 		if err := client.UpdateMonitor(id, fields); err != nil {
@@ -425,6 +451,8 @@ func init() {
 	monitorsEditCmd.Flags().StringVar(&editMonMessage, "message", "", "New notification message")
 	monitorsEditCmd.Flags().StringVar(&editMonTags, "tags", "", "New tags (comma-separated)")
 	monitorsEditCmd.Flags().IntVar(&editMonPriority, "priority", 0, "New priority (1-5)")
+	monitorsEditCmd.Flags().StringArrayVar(&editMonOptions, "option", nil, "Set one option, keeping the rest: key=value (repeatable; renotify_interval=60)")
+	monitorsEditCmd.Flags().StringArrayVar(&editMonThresholds, "threshold", nil, "Set one threshold, keeping the rest: name=value (repeatable; critical=0.05)")
 
 	monitorsDeleteCmd.Flags().BoolVar(&deleteMonForce, "force", false, "Skip confirmation")
 
@@ -435,4 +463,29 @@ func init() {
 	monitorsCmd.AddCommand(monitorsDeleteCmd)
 	monitorsCmd.AddCommand(monitorsImportCmd)
 	monitorsCmd.AddCommand(monitorsExportCmd)
+}
+
+var editMonOptions, editMonThresholds []string
+
+// applySettings sets key=value pairs on a JSON object, reading each value
+// as JSON when it is (60, true, null, {"a":1}) and as text otherwise; null
+// removes the key.
+func applySettings(obj map[string]interface{}, pairs []string) error {
+	for _, kv := range pairs {
+		k, v, ok := strings.Cut(kv, "=")
+		k = strings.TrimSpace(k)
+		if !ok || k == "" {
+			return fmt.Errorf("%q isn't key=value", kv)
+		}
+		var val interface{}
+		if err := json.Unmarshal([]byte(v), &val); err != nil {
+			val = v
+		}
+		if val == nil {
+			delete(obj, k)
+			continue
+		}
+		obj[k] = val
+	}
+	return nil
 }
