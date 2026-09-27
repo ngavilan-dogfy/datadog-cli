@@ -20,8 +20,14 @@ type EventV2 struct {
 	Tags      []string  `json:"tags,omitempty"`
 	// Monitor is set on monitor transitions (source:alert).
 	Monitor *EventMonitor `json:"monitor,omitempty"`
-	// Changed names what changed, on change events ("checkout-00042-kx7").
-	Changed string `json:"changed,omitempty"`
+	// Changed names what changed, on change events ("checkout-00042-kx7"),
+	// with the kind of resource ("gcp_run_revision"), the operation
+	// (UPDATE, CREATE…) and the resource's full key, which says its project
+	// or cluster.
+	Changed      string `json:"changed,omitempty"`
+	ResourceType string `json:"resource_type,omitempty"`
+	Operation    string `json:"operation,omitempty"`
+	ResourceKey  string `json:"resource_key,omitempty"`
 }
 
 // EventMonitor is the monitor a transition event is about.
@@ -106,6 +112,11 @@ func parseEventV2(raw json.RawMessage) (EventV2, bool) {
 					Name string `json:"name"`
 					Type string `json:"type"`
 				} `json:"changed_resource"`
+				ChangeMetadata *struct {
+					ResourceType string `json:"resource_type"`
+					Operation    string `json:"operation"`
+					Key          string `json:"key"`
+				} `json:"change_metadata"`
 				Evt struct {
 					Category string `json:"category"`
 					Name     string `json:"name"`
@@ -153,7 +164,13 @@ func parseEventV2(raw json.RawMessage) (EventV2, bool) {
 			FromState: m.Transition.From, ToState: m.Transition.To}
 	}
 	if r := a.Attributes.ChangedResource; r != nil {
-		ev.Changed = r.Name
+		ev.Changed, ev.ResourceType = r.Name, r.Type
+	}
+	if m := a.Attributes.ChangeMetadata; m != nil {
+		if m.ResourceType != "" {
+			ev.ResourceType = m.ResourceType
+		}
+		ev.Operation, ev.ResourceKey = m.Operation, m.Key
 	}
 	return ev, true
 }

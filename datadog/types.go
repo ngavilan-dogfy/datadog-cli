@@ -356,6 +356,9 @@ type MetricsQueryResponse struct {
 }
 
 type MetricsSeries struct {
+	// QueryIndex is which query of a comma-separated batch the series
+	// answers.
+	QueryIndex  int           `json:"query_index"`
 	Metric      string        `json:"metric"`
 	Pointlist   PointList     `json:"pointlist"`
 	Scope       string        `json:"scope"`
