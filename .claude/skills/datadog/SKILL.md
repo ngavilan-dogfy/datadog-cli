@@ -68,7 +68,8 @@ in Datadog without an explicit yes.
 - **Words that aren't names** ("payments", "the order webhook", "login"):
   `datadog find <words> --json` says what they are in Datadog — services,
   endpoints, monitors, dashboards, metrics — best first, each with the
-  command that reads it.
+  command that reads it. Pass the user's words as they are, Spanish
+  included: `datadog find "¿por qué fallan los pedidos?"` finds orders.
 - **A link** (dashboard, monitor, trace, logs search, APM service, metric,
   incident, SLO, event, host): `datadog read "<url>" --md`. It keeps the
   link's time window, template variables and query.

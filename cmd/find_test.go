@@ -57,6 +57,39 @@ func TestMatchScore(t *testing.T) {
 	}
 }
 
+// People ask in their words and their language; names are in English.
+func TestQuestionsInPlainWords(t *testing.T) {
+	for in, want := range map[string][]string{
+		"¿Por qué fallan los pedidos desde ayer?":       {"pedidos"},
+		"why is checkout slow since this morning?":      {"checkout"},
+		"errores en los envíos":                         {"envios"},
+		"errors":                                        {"errors"}, // all it has
+		"el servicio de pagos va lento":                 {"pagos"},
+		"what happened to the order webhook yesterday?": {"order", "webhook"},
+	} {
+		if got := queryWords(in); !reflect.DeepEqual(got, want) {
+			t.Errorf("queryWords(%q) = %q, want %q", in, got, want)
+		}
+	}
+	for _, c := range []struct{ query, name string }{
+		{"pedidos", "orders-api"},
+		{"pagos", "payments"},
+		{"envios", "shipping-service"},
+		{"envíos", "shipping-service"},
+		{"facturación", "billing"},
+		{"los clientes", "GET /v1/customers/:id"},
+		{"pedidos", "Pedidos creados por día"}, // names in Spanish still match
+		{"dia", "Pedidos creados por día"},
+	} {
+		if s := matchScore(queryWords(c.query), c.name); s < findThreshold {
+			t.Errorf("%q should match %q (score %.2f)", c.query, c.name, s)
+		}
+	}
+	if s := matchScore(queryWords("pedidos"), "customers"); s >= findThreshold {
+		t.Errorf("pedidos are orders, not customers (%.2f)", s)
+	}
+}
+
 func TestEndpointScoreNeedsTheEndpointsOwnWords(t *testing.T) {
 	if s := endpointScore(queryWords("api"), "api", "GET /v1/status"); s >= findThreshold {
 		t.Errorf("every endpoint of service api matched \"api\" (%.2f)", s)

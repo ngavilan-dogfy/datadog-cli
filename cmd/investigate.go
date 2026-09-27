@@ -56,8 +56,10 @@ that would have caught it, one that fired late) and the next commands to
 dig. Every claim cites a reference: a Datadog link to the exact view, which
 'datadog read' reads back.
 
-The argument is a service name, or words ("checkout", "orders") resolved
-with 'datadog find'. Times can be spoken: --around "yesterday 18:00".
+The argument is a service name, or the question itself ("checkout",
+"why are orders failing?", "¿por qué fallan los pedidos?") resolved with
+'datadog find' to a service or an endpoint. Times can be spoken:
+--around "yesterday 18:00", --since "hace 2h".
 
 Output:
   Terminal: the report · --md: markdown to paste in a ticket or a chat ·
@@ -319,7 +321,7 @@ func resolveTarget(target, resource, env string, from, to time.Time) (string, *s
 			return target, nil, resource, []string{fmt.Sprintf("%s sends logs but no APM spans", target)}, nil
 		}
 	}
-	rep := runFind(target, env, lookFrom, to)
+	rep := findScopes(target, env, lookFrom, to)
 	best := rep.Best
 	if best == nil || best.Score < findThreshold || (best.Kind != "service" && best.Kind != "endpoint" && best.Kind != "operation") {
 		var seen []string

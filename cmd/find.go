@@ -64,7 +64,11 @@ dashboards watch it? find looks everywhere at once:
   hosts        whose name contains a word
   logs         that mention the words, and which services write them
 
-Matching forgives case, plurals, word order and small typos. Each match
+Ask the way you'd ask a person: the words a question is wrapped in (why,
+since, today, ¿por qué…?, desde ayer) and what's wrong (errors, slow,
+caído) are set aside, and Spanish words find the English names services
+have (pedidos → orders, pagos → payments, envíos → shipping). Matching
+forgives case, accents, plurals, word order and small typos. Each match
 says what to run next; the best one comes first.
 
 Output:
@@ -73,6 +77,7 @@ Output:
 Examples:
   datadog find checkout
   datadog find "web store"
+  datadog find "¿por qué fallan los pedidos?"
   datadog find orders --json | jq '.best'`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -103,12 +108,90 @@ func init() {
 
 // ─── matching ────────────────────────────────────────────────────
 
-// stopWords carry no meaning in a search, in English and Spanish.
-var stopWords = map[string]bool{
-	"the": true, "a": true, "an": true, "of": true, "in": true, "on": true, "for": true, "and": true, "to": true,
-	"el": true, "la": true, "los": true, "las": true, "de": true, "del": true, "en": true, "y": true, "un": true, "una": true,
-	"service": true, "servicio": true, "app": true,
+// stopWords carry no meaning in a search, in English and Spanish: articles,
+// and the words people wrap a question in ("why is … failing since
+// yesterday?", "¿por qué fallan … desde ayer?"). Accents are folded first.
+var stopWords = setOf(
+	"the", "a", "an", "of", "in", "on", "for", "and", "to", "at", "by", "with", "from", "or",
+	"why", "what", "when", "where", "who", "how", "is", "are", "was", "were", "be", "been", "it", "its",
+	"this", "that", "these", "those", "since", "until", "today", "yesterday", "now", "morning",
+	"afternoon", "evening", "night", "not", "does", "do", "did", "my", "our", "your", "there", "any",
+	"all", "happened", "happening", "going", "wrong", "again", "failing", "fails", "failed", "fail",
+	"broken", "working", "work",
+	"el", "la", "los", "las", "lo", "de", "del", "en", "y", "o", "un", "una", "unos", "unas", "al", "con",
+	"sin", "por", "para", "que", "porque", "cuando", "donde", "quien", "como", "cual", "es", "son", "era",
+	"fue", "esta", "estan", "estaba", "este", "esto", "estos", "estas", "ese", "esa", "eso", "desde",
+	"hasta", "hoy", "ayer", "anteayer", "ahora", "manana", "tarde", "noche", "madrugada", "no", "se", "le",
+	"les", "nos", "me", "mi", "mis", "nuestro", "nuestra", "nuestros", "nuestras", "muy", "mas", "todo",
+	"todos", "toda", "todas", "algo", "hay", "ha", "han", "pasa", "pasado", "pasando", "ocurre",
+	"ocurrido", "va", "van", "iba", "funciona", "funcionan", "sigue", "siguen", "otra", "vez", "falla",
+	"fallan", "fallando", "fallaron", "fallado", "roto", "rota", "rotos", "rotas",
+	"service", "servicio", "app",
+)
+
+// symptomWords say what's wrong or what kind of thing is meant, not which
+// one: dropped when the search has other words ("errores en pagos" looks
+// for payments), kept when they're all it has.
+var symptomWords = setOf(
+	"error", "errors", "errores", "fallo", "fallos", "failure", "failures", "latency", "latencia", "slow",
+	"slower", "lento", "lenta", "lentos", "lentas", "timeout", "timeouts", "crash", "crashes", "caida",
+	"caidas", "caido", "down", "outage", "incident", "incidents", "incidente", "incidentes", "problem",
+	"problems", "problema", "problemas", "issue", "issues", "alert", "alerts", "alerta", "alertas",
+	"monitor", "monitors", "monitores", "dashboard", "dashboards", "panel", "endpoint", "endpoints",
+	"metric", "metrics", "metrica", "metricas", "log", "logs", "trace", "traces", "traza", "trazas",
+)
+
+// spelledInEnglish are the English words a name uses for a Spanish one:
+// people ask in their language, services are named in English.
+var spelledInEnglish = map[string][]string{
+	"pago": {"payment", "pay", "billing"}, "pagos": {"payments", "pay", "billing"},
+	"pedido": {"order"}, "pedidos": {"orders"},
+	"cliente": {"customer", "client"}, "clientes": {"customers", "clients"},
+	"usuario": {"user", "account"}, "usuarios": {"users", "accounts"},
+	"cuenta": {"account"}, "cuentas": {"accounts"},
+	"envio": {"shipping", "shipment", "delivery"}, "envios": {"shipping", "shipments", "deliveries"},
+	"entrega": {"delivery"}, "entregas": {"deliveries"}, "reparto": {"delivery", "courier"},
+	"factura": {"invoice", "billing"}, "facturas": {"invoices", "billing"}, "facturacion": {"billing", "invoicing"},
+	"suscripcion": {"subscription"}, "suscripciones": {"subscriptions"},
+	"carrito": {"cart", "basket"}, "cesta": {"cart", "basket"}, "tienda": {"shop", "store"},
+	"producto": {"product"}, "productos": {"products", "catalog"}, "catalogo": {"catalog"},
+	"precio": {"price", "pricing"}, "precios": {"prices", "pricing"},
+	"inventario": {"inventory", "stock"}, "almacen": {"warehouse", "inventory"},
+	"notificacion": {"notification"}, "notificaciones": {"notifications"},
+	"correo": {"email", "mail"}, "correos": {"emails", "mail"},
+	"mensaje": {"message"}, "mensajes": {"messages"},
+	"sesion": {"session", "login", "auth"}, "sesiones": {"sessions"}, "acceso": {"login", "auth", "access"},
+	"autenticacion": {"auth", "authentication"}, "contrasena": {"password"},
+	"registro": {"signup", "registration", "register"}, "alta": {"signup", "onboarding"},
+	"busqueda": {"search"}, "buscador": {"search"},
+	"pagina": {"page", "web"}, "paginas": {"pages", "web"}, "web": {"web", "website"},
+	"cola": {"queue"}, "colas": {"queues"},
+	"datos": {"data", "db", "database"}, "bd": {"db", "database"},
+	"servidor": {"server", "host"}, "servidores": {"servers", "hosts"},
+	"trabajo": {"job", "worker"}, "trabajos": {"jobs", "workers"}, "tarea": {"task", "job", "cron"}, "tareas": {"tasks", "jobs", "cron"},
+	"proceso": {"process", "worker"}, "procesos": {"processes", "workers"},
+	"informe": {"report"}, "informes": {"reports"}, "reporte": {"report"}, "reportes": {"reports"},
+	"devolucion": {"refund", "return"}, "devoluciones": {"refunds", "returns"}, "reembolso": {"refund"}, "reembolsos": {"refunds"},
+	"descuento": {"discount", "coupon", "promo"}, "descuentos": {"discounts", "coupons", "promos"},
+	"cupon": {"coupon"}, "cupones": {"coupons"}, "promocion": {"promo", "promotion"}, "promociones": {"promos", "promotions"},
+	"tarjeta": {"card"}, "tarjetas": {"cards"}, "direccion": {"address"}, "direcciones": {"addresses"},
+	"archivo": {"file", "storage"}, "archivos": {"files", "storage"}, "fichero": {"file"}, "ficheros": {"files"},
+	"imagen": {"image", "media"}, "imagenes": {"images", "media"}, "subida": {"upload"}, "descarga": {"download"},
+	"importacion": {"import"}, "exportacion": {"export"}, "sincronizacion": {"sync"},
+	"movil": {"mobile", "app"}, "aplicacion": {"app", "application"},
 }
+
+func setOf(ws ...string) map[string]bool {
+	m := make(map[string]bool, len(ws))
+	for _, w := range ws {
+		m[w] = true
+	}
+	return m
+}
+
+// fold drops the accents a search may or may not carry ("envíos", "envios").
+var fold = strings.NewReplacer("á", "a", "é", "e", "í", "i", "ó", "o", "ú", "u", "ü", "u", "ñ", "n",
+	"à", "a", "è", "e", "ì", "i", "ò", "o", "ù", "u", "ç", "c").Replace
 
 // words splits text into lowercase words, camelCase and punctuation apart.
 func words(s string) []string {
@@ -116,7 +199,7 @@ func words(s string) []string {
 	var cur []rune
 	flush := func() {
 		if len(cur) > 0 {
-			out = append(out, strings.ToLower(string(cur)))
+			out = append(out, fold(strings.ToLower(string(cur))))
 			cur = cur[:0]
 		}
 	}
@@ -138,11 +221,18 @@ func words(s string) []string {
 
 // queryWords are the meaningful words of a search.
 func queryWords(q string) []string {
-	var out []string
+	var out, symptoms []string
 	for _, w := range words(q) {
-		if !stopWords[w] {
+		switch {
+		case stopWords[w]:
+		case symptomWords[w]:
+			symptoms = append(symptoms, w)
+		default:
 			out = append(out, w)
 		}
+	}
+	if len(out) == 0 {
+		return symptoms
 	}
 	return out
 }
@@ -218,6 +308,9 @@ func matchScore(q []string, name string) float64 {
 	total, missed := 0.0, 0
 	for _, w := range q {
 		s := wordScore(w, tokens, joined)
+		for _, en := range spelledInEnglish[w] {
+			s = max(s, 0.95*wordScore(en, tokens, joined))
+		}
 		if s == 0 {
 			missed++
 		}
@@ -245,6 +338,16 @@ func endpointScore(q []string, service, resource string) float64 {
 const findThreshold = 0.5
 
 func runFind(query, env string, from, to time.Time) *findReport {
+	return search(query, env, from, to, true)
+}
+
+// findScopes looks only for what can be investigated — services, endpoints
+// and operations — sparing the searches (and the rate limits) the rest takes.
+func findScopes(query, env string, from, to time.Time) *findReport {
+	return search(query, env, from, to, false)
+}
+
+func search(query, env string, from, to time.Time, everything bool) *findReport {
 	q := queryWords(query)
 	rep := &findReport{Query: query, Env: env, From: from, To: to, Failed: map[string]string{}}
 	f, t := from.UTC().Format(time.RFC3339), to.UTC().Format(time.RFC3339)
@@ -332,7 +435,7 @@ func runFind(query, env string, from, to time.Time) *findReport {
 		}
 		return nil
 	})
-	run("logs", func() error {
+	logServices := func() error {
 		res, err := client.AggregateLogs(scope, f, t, []string{"service"}, 100)
 		if err != nil {
 			return err
@@ -344,8 +447,11 @@ func runFind(query, env string, from, to time.Time) *findReport {
 			}
 		}
 		return nil
-	})
-	if len(q) > 0 {
+	}
+	if everything {
+		run("logs", logServices)
+	}
+	if everything && len(q) > 0 {
 		run("log mentions", func() error {
 			text := strings.Join(q, " ")
 			search := text
@@ -394,6 +500,22 @@ func runFind(query, env string, from, to time.Time) *findReport {
 		}
 		return nil
 	})
+	if !everything {
+		wg.Wait()
+		// Services that only log: looked for only when APM found nothing,
+		// as log searches are scarce (and the investigation needs them).
+		found := len(rep.Matches) > 0
+		spanCounts.Range(func(k, _ any) bool {
+			found = found || matchScore(q, k.(string)) >= findThreshold
+			return !found
+		})
+		if !found {
+			if err := logServices(); err != nil {
+				rep.Failed["logs"] = err.Error()
+			}
+		}
+		return finishFind(rep, services, &spanCounts, &logCounts, add, service)
+	}
 	run("monitors", func() error {
 		res, err := client.SearchMonitorsRich(strings.Join(q, " "), 50)
 		if err != nil {
@@ -481,7 +603,12 @@ func runFind(query, env string, from, to time.Time) *findReport {
 		})
 	}
 	wg.Wait()
+	return finishFind(rep, services, &spanCounts, &logCounts, add, service)
+}
 
+// finishFind adds every service seen, with its spans and logs, and orders
+// the matches.
+func finishFind(rep *findReport, services map[string]*findMatch, spanCounts, logCounts *sync.Map, add func(findMatch), service func(string) *findMatch) *findReport {
 	// Services: every one with spans or logs, scored by name.
 	add2 := func(name string) {
 		s := service(name)
@@ -506,7 +633,7 @@ func runFind(query, env string, from, to time.Time) *findReport {
 		add(*s)
 	}
 	seen := map[string]bool{}
-	for _, m := range []*sync.Map{&spanCounts, &logCounts} {
+	for _, m := range []*sync.Map{spanCounts, logCounts} {
 		m.Range(func(k, _ any) bool {
 			if name := k.(string); !seen[name] {
 				seen[name] = true
