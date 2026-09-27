@@ -12,7 +12,7 @@ import (
 // it: the kind of page, its id, and the context the page had (time window,
 // template variables, search query).
 type ddLink struct {
-	Kind  string // dashboard, monitor, trace, logs, apm-service, incident, slo, notebook, metric
+	Kind  string // dashboard, monitor, trace, logs, traces, apm-service, incident, slo, notebook, metric, events, audit, host
 	ID    string
 	Query string            // logs/traces search, metric query
 	Vars  map[string]string // dashboard template variables
@@ -88,10 +88,13 @@ func parseDDLink(raw string) (ddLink, bool) {
 		}
 	case strings.HasPrefix(path, "/metric/explorer") || strings.HasPrefix(path, "/metric/summary"):
 		l.Kind = "metric"
-		l.Query = q.Get("metric")
-		if exp := q.Get("exp_metric"); exp != "" {
-			l.Query = exp
-		}
+		l.Query = metricQueryFromLink(q)
+	case strings.HasPrefix(path, "/event/explorer") || strings.HasPrefix(path, "/event/stream"):
+		l.Kind, l.Query = "events", q.Get("query")
+	case strings.HasPrefix(path, "/audit-trail"):
+		l.Kind, l.Query = "audit", q.Get("query")
+	case strings.HasPrefix(path, "/infrastructure") && q.Get("host") != "":
+		l.Kind, l.ID = "host", q.Get("host")
 	default:
 		return l, false
 	}
@@ -108,4 +111,32 @@ func (l ddLink) window() (time.Duration, time.Time, bool) {
 		return l.To.Sub(l.From), time.Time{}, true
 	}
 	return l.To.Sub(l.From), l.To, true
+}
+
+// metricQueryFromLink rebuilds a metric query from a Metrics Explorer link:
+// the exact query when the link carries one (the CLI's own links do), else
+// what the explorer's fields say (agg:metric{scope} by {group}).
+func metricQueryFromLink(q url.Values) string {
+	if exact := strings.TrimSpace(q.Get("q")); exact != "" {
+		return exact
+	}
+	metric := q.Get("exp_metric")
+	if metric == "" {
+		return q.Get("metric")
+	}
+	if q.Get("exp_agg") == "" && q.Get("exp_scope") == "" && q.Get("exp_group") == "" {
+		return metric
+	}
+	agg, scope := q.Get("exp_agg"), q.Get("exp_scope")
+	if agg == "" {
+		agg = "avg"
+	}
+	if scope == "" {
+		scope = "*"
+	}
+	out := agg + ":" + metric + "{" + scope + "}"
+	if g := q.Get("exp_group"); g != "" {
+		out += " by {" + g + "}"
+	}
+	return out
 }

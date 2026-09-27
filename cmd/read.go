@@ -31,7 +31,9 @@ link carries (time window, template variables, search query):
   logs search → the patterns of those logs       (logs patterns)
   APM service → its traffic, errors, latency and coverage gaps
   metric      → the metric described             (metrics describe)
-  incident, SLO → their details
+  events      → monitor transitions, deploys and changes in the window
+  audit trail → who changed what
+  incident, SLO, host → their details
 
 Made for agents: someone pastes a link in a chat, the agent reads it.
 
@@ -157,6 +159,26 @@ Examples:
 				return err
 			}
 			return out(rep, rep.markdown, func() string { return rep.text(isTTY()) })
+		case "events":
+			q := l.Query
+			if q == "" {
+				q = "*"
+			}
+			evs, err := client.SearchEvents(q, from.UTC().Format(time.RFC3339), to.UTC().Format(time.RFC3339), 100)
+			if err != nil {
+				return err
+			}
+			rep := eventList{Query: q, From: from, To: to, Events: evs}
+			return out(rep, rep.markdown, rep.text)
+		case "audit":
+			if readJSON {
+				auditJSON = true
+			}
+			auditQuery, auditFrom, auditTo = l.Query, from.Format(time.RFC3339), to.Format(time.RFC3339)
+			return auditCmd.RunE(auditCmd, nil)
+		case "host":
+			rep := readHost(l.ID, from, to)
+			return out(rep, rep.markdown, func() string { return rep.text(isTTY()) })
 		}
 		return fmt.Errorf("%s links aren't read yet: open it with 'datadog open'", l.Kind)
 	},
@@ -249,6 +271,55 @@ func (sr *serviceRead) markdown() string {
 				b.WriteString("  ```\n  " + g.Fix + "\n  ```\n")
 			}
 		}
+	}
+	return b.String()
+}
+
+// hostRead is a host's vital signs over the window.
+type hostRead struct {
+	Host    string            `json:"host"`
+	From    time.Time         `json:"from"`
+	To      time.Time         `json:"to"`
+	Metrics []*describeResult `json:"metrics"`
+}
+
+// hostMetrics are the vitals read for a host: the ones every Datadog Agent
+// sends.
+var hostMetrics = []string{"avg:system.cpu.user{%s}", "avg:system.mem.pct_usable{%s}", "avg:system.load.norm.1{%s}"}
+
+func readHost(host string, from, to time.Time) *hostRead {
+	hr := &hostRead{Host: host, From: from, To: to}
+	for _, q := range hostMetrics {
+		if res, err := describeMetric(fmt.Sprintf(q, "host:"+host), from, to, "", 3); err == nil && len(res.Series) > 0 {
+			hr.Metrics = append(hr.Metrics, res)
+		}
+	}
+	return hr
+}
+
+func (hr *hostRead) header() string { return "Host " + hr.Host + " · " + fmtWindow(hr.From, hr.To) }
+
+func (hr *hostRead) text(tty bool) string {
+	var b strings.Builder
+	title := hr.header()
+	if tty {
+		title = ui.Title.Render(title)
+	}
+	b.WriteString(title + "\n")
+	if len(hr.Metrics) == 0 {
+		b.WriteString("  no system metrics for this host in the window\n")
+	}
+	for _, m := range hr.Metrics {
+		b.WriteString("\n" + m.text())
+	}
+	return b.String()
+}
+
+func (hr *hostRead) markdown() string {
+	var b strings.Builder
+	b.WriteString("## " + hr.header() + "\n\n")
+	for _, m := range hr.Metrics {
+		b.WriteString(m.markdown() + "\n")
 	}
 	return b.String()
 }
