@@ -21,6 +21,11 @@ of calling Datadog (see `cmd/e2e_hooks.go`); it is never part of a release.
 With your own credentials you can smoke-test reading commands against a real
 organization. Never run a command that changes Datadog to try something.
 
+`DATADOG_DEBUG_TIMING=1` makes `investigate` print how long each of its
+calls took to stderr: the place to look when it gets slow. Its hidden
+`--facts` flag prints what it gathered before judging, the input its tests
+are made of.
+
 ## What a change needs
 
 - **Tests.** Analysis code (`internal/series`, `internal/logpattern`, trace

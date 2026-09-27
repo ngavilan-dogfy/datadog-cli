@@ -1,6 +1,6 @@
 ---
 name: datadog
-description: Investigate production and improve observability through Datadog with the `datadog` CLI. Covers what's alerting, why a service is slow or failing, what changed (deploys, config edits), logs, metrics, traces, RUM, monitors, dashboards, incidents and SLOs — and reading dashboards, finding monitoring gaps, and designing better dashboards and monitors. Use it when the user asks about alerts, on-call, an incident or outage, errors, latency, "is X down?", "what happened at 10:00?", a deploy that may have broken something, a trace id, pastes a Datadog link, or wants to review or improve dashboards, monitors or coverage.
+description: Investigate production and improve observability through Datadog with the `datadog` CLI. Turns a question in plain words ("why is checkout failing since this morning?") into an investigation that correlates traffic, errors, latency, dependencies, logs, hosts, deploys and config changes, and writes a report with references. Covers what's alerting, what changed, logs, metrics, traces, RUM, monitors, dashboards, incidents and SLOs — and reviewing monitors (noisy, silent, stuck, loose), finding monitoring gaps, and designing better dashboards and monitors. Use it when the user asks about alerts, on-call, an incident or outage, errors, latency, "is X down?", "what happened at 10:00?", a deploy that may have broken something, a trace id, pastes a Datadog link, or wants to review or improve dashboards, monitors or coverage.
 argument-hint: "[question | service | monitor id | trace id | Datadog link]"
 allowed-tools: Bash, Read, Write
 ---
@@ -48,10 +48,12 @@ in Datadog without an explicit yes.
 3. **Prove every claim.** Monitor id, name and state; the exact query; counts
    together with their window; log samples (timestamp, service, message); the
    deploy or config change, with who and when.
-4. **Be exact about time.** Timestamps in RFC3339 (`2026-05-19T09:30:00Z`)
-   work in every flag; durations look like `30m`, `2h`, `1d`. Turn "since ten
-   o'clock" into UTC using the user's timezone (`date +%Z`), and give times
-   in answers with their timezone.
+4. **Be exact about time.** Flags take times as people say them, in the
+   machine's local time — `--since "today 10:00"`, `--around "yesterday
+   18:00"`, `--from monday`, `"hace 2h"`, `"ayer a las 18:00"` — as well as
+   RFC3339 (`2026-05-19T09:30:00Z`) and durations (`30m`, `2h`, `1d`). Pass
+   the user's words through when they're clear; check the window the report
+   prints, and give times in answers with their timezone.
 5. **Symptom ≠ cause.** Latency on `checkout` may come from a dependency.
    Two things at the same time are a lead, not a proof. Say how sure you are.
 6. **Don't loop.** The client already retries 429s and 5xx, and waits for
@@ -60,9 +62,16 @@ in Datadog without an explicit yes.
 
 ## 2. Start here
 
+- **A question about a service** ("why is checkout slow since 9?", "did the
+  order webhook fail yesterday evening?"): `datadog investigate` — the
+  playbook in section 3 starts there.
+- **Words that aren't names** ("payments", "the order webhook", "login"):
+  `datadog find <words> --json` says what they are in Datadog — services,
+  endpoints, monitors, dashboards, metrics — best first, each with the
+  command that reads it.
 - **A link** (dashboard, monitor, trace, logs search, APM service, metric,
-  incident, SLO): `datadog read "<url>" --md`. It keeps the link's time
-  window, template variables and query.
+  incident, SLO, event, host): `datadog read "<url>" --md`. It keeps the
+  link's time window, template variables and query.
 - **A trace id**: `datadog trace <id> --md`.
 - **Anything else**: the snapshot.
 
@@ -93,6 +102,37 @@ rarely a coincidence.
 
 ## 3. Playbooks: incidents
 
+### A question, answered with a report
+1. **Map the words.** If the service isn't named exactly: `datadog find <words> --json`;
+   take the best match and say which one you took.
+2. **Investigate** over the user's window, with their question:
+   ```bash
+   datadog investigate checkout --since "today 09:00" --question "why is checkout failing since this morning?" --json
+   datadog investigate checkout --resource "POST /orders" --around "yesterday 18:00" --window 1h --md
+   datadog investigate payments checkout --since 2h --json     # plain words work too
+   ```
+   It compares with the day before (`--compare 7d` for weekly patterns) and
+   correlates: traffic, errors and latency per endpoint; dependencies (what
+   the service calls); error logs that are new or grew; the process and its
+   hosts (event loop, GC, CPU, memory); new instances and versions, change
+   events, config changes in the audit trail, alerts and incidents. The JSON
+   has `summary`, `status`, `onset`, `timeline`, `leads` (`confidence`,
+   `evidence_for`, `evidence_against`, `verify`), `findings`,
+   `checked_normal`, `could_not_check`, `suggestions`, `next_steps` and
+   numbered `references` (links to the exact Datadog view, with the query).
+3. **Test the leads before you repeat them.** Run the top lead's `verify`
+   command; `datadog read "<reference url>"` on the claims you'll quote;
+   follow `next_steps` (`datadog trace <id>` on the slow or failing request,
+   `logs patterns --around <onset>`). A lead is a hypothesis until its
+   evidence holds; say so when it doesn't.
+4. **Report** (section 7): the answer first, then the timeline, the leads with
+   their confidence, what was ruled out and what couldn't be checked. Cite
+   references (`[3]`) and keep their links. `--md` gives a ready report to
+   start from; rewrite it for the user, don't paste it whole.
+5. **Propose improvements** from `suggestions` (the monitor that was missing
+   or alerted late) and `datadog monitors review --service <svc>`, as commands
+   the user can approve (section 8).
+
 ### "What's going on?" (on-call check, handover)
 1. `datadog triage --json` with the digest above.
 2. For each alerting monitor that matters: `datadog monitors explain <id> --md`
@@ -101,7 +141,8 @@ rarely a coincidence.
 3. Report: what is on fire, what is only noisy, what changed recently, and
    what you would look at first.
 
-### "Why is <service> slow / failing?"
+### "Why is <service> slow / failing?" (by hand, to dig deeper)
+`datadog investigate <service>` does steps 1–6 in one call. By hand:
 1. `datadog read "<APM service link>"` or `datadog services context <service> --since 1h --json`:
    requests, errors and p95 described, monitors, SLOs, log volume, failing
    endpoints, deploys and downtimes.
@@ -160,9 +201,9 @@ rarely a coincidence.
    way the monitor evaluates it, when it was past the threshold, groups not
    OK, who it notifies (or that it notifies no one).
 2. Was it edited? `datadog audit --since 7d --query "@evt.name:Monitor" --json`.
-3. For a noisy monitor, suggest concrete changes (a longer evaluation window,
-   a recovery threshold, a warning level, grouping) as text, with the numbers
-   from step 1. Changing the monitor is a write (section 8).
+3. `datadog monitors review <id> --md`: what it did in 30 days (alerts,
+   flaps, time alerting) and the fixes, as commands. Changing the monitor is
+   a write (section 8).
 
 ### "Is <service> healthy?" / error budget
 `datadog slos --query <service> --json`, then `datadog slos show <id> --json`
@@ -178,13 +219,29 @@ exist…), always 0, unreadable charts, duplicated widgets, filters every
 widget hardcodes. Each widget has its JSON path (`widgets[2].definition.widgets[0]`).
 For a person: `datadog ui <dashboard>`.
 
+### "Are our monitors any good?"
+`datadog monitors review --md` (or `--service <svc>`, `--tag team:<t>`, ids):
+every monitor next to what it did over 30 days, sorted into *to fix* (notifies
+no one; stuck in Alert or No Data for days; a floor that goes quiet when
+traffic stops completely; a query left with a template placeholder; OK with
+no data), *worth a look* (flapping, alerting most of the time or over and
+over, a P1/P2 that never reminds, cloud metrics without an evaluation delay,
+a threshold its data never came near, No Data noise, muted with no end) and
+*to tidy* (no runbook link, no `{{value}}`, no owner tag, old drafts,
+duplicates). Each finding has a `fix` — `datadog monitors edit <id> --option
+key=value` or `--threshold name=value`, which change one setting and keep
+the rest — or a `check` to read first. Present them grouped by severity;
+apply none without a yes, one by one or as a batch the user approved.
+
 ### "Are we monitoring the right things?" / "What's missing?"
 1. `datadog coverage --md` (production by default; `--since 7d`): each
    service's APM traffic and error logs against its monitors (errors, latency,
    traffic, logs), SLOs and owner, and the gaps, each with the monitor query
    that would close it, built from the service's own metrics.
-2. `datadog dashboards read <id> --problems --md` on the dashboards the team uses.
-3. Report the gaps by risk (a service with traffic and no error or latency
+2. `datadog monitors review --md`: whether the monitors that exist would
+   actually fire, and reach someone.
+3. `datadog dashboards read <id> --problems --md` on the dashboards the team uses.
+4. Report the gaps by risk (a service with traffic and no error or latency
    monitor first), with the proposed monitors. Creating them is a write.
 
 ### "Make us a better dashboard / monitor"
@@ -245,6 +302,10 @@ Example: `avg:system.cpu.user{env:prod,service:api} by {host}`.
 
 | Command | Use |
 |---|---|
+| `datadog investigate <svc> --since "<when>" --json` | A question answered: leads, evidence, references |
+| `datadog find <words> --json` | What words are in Datadog: services, endpoints, monitors… |
+| `datadog monitors review [--service <s>] --md` | Monitors against what they did, with fixes |
+| `datadog events search "<q>" --since 1d --json` | Monitor transitions, deploys, resource changes |
 | `datadog read "<link>" --md` | Any Datadog link, read with its context |
 | `datadog triage --json` | Everything at once (section 2) |
 | `datadog services context <svc> --json` | One service, everything |
@@ -294,6 +355,9 @@ Next
 2. …
 ```
 
+- Cite what you checked: `[3]` after a claim, with the reference list (the
+  links `investigate` returns, or the Datadog links of what you read) at the
+  end, so the user can open the exact view.
 - Don't paste raw JSON. Use short tables for lists of monitors and services.
 - Say what you couldn't check and why (a 403 on RUM, CI Visibility not
   enabled, a partial trace…).
@@ -310,7 +374,7 @@ Describe the exact command and its effect, and wait for a yes:
 | `batch mute/unmute` | Many monitors at once |
 | `downtimes schedule --scope … --duration …` · `downtimes cancel <id>` | Scheduled silences |
 | `hosts mute/unmute` | Silence a host |
-| `monitors create/edit/import/delete` | Change monitors (`create --dry-run` previews) |
+| `monitors create/edit/import/delete` | Change monitors (`create --dry-run` previews; `edit --option k=v` / `--threshold name=v` change one setting) |
 | `dashboards create/clone/import/delete` | Change dashboards (`create --dry-run` previews) |
 | `incidents create/update` | Declare or update an incident |
 | `events post` · `deploy` | Post an event (`deploy --dry-run` previews) |

@@ -35,6 +35,7 @@ long-lived model that fetches concurrently and repaints.
 | `cmd/datadog/main.go` | Entry point: `cmd.Execute()`. |
 | `cmd/` | One file per command area; every command registers itself in `init()`. `root.go` loads the profile, builds the client, enforces read-only mode and offers setup on first run. `output.go` has the TTY/TSV/JSON helpers. |
 | `cmd/` — reading commands | `read.go` (link dispatch), `trace.go`, `metrics_describe.go`, `metrics_tags.go`, `logs_patterns.go`, `dashboards_read.go`, `monitors_explain.go`, `coverage.go`. Each fetches with the client and hands the data to a pure package for analysis. |
+| `cmd/` — questions | `find.go` (words → what exists), `investigate.go` (gathering), `investigate_analysis.go` (facts → verdicts, onset, leads), `investigate_report.go` (text and markdown), `monitors_review.go` (monitors against what they did), `refs.go` (numbered references and the links behind them), `when.go` and `window.go` (times as people say them, shared window flags), `events_search.go`. |
 | `cmd/` — onboarding | `setup.go` (the guided flow), `keyinput.go` (the secret prompt that watches the clipboard), `wizard_ui.go` (step headers, status lines, spinners), `doctor.go`, `update.go`, `skill.go` (the embedded Claude Code skill). |
 | `datadog/` | The HTTP client: `client.go` (auth, retries, rate limits), one `client_*.go` per API area, `types*.go` modeled on real responses, `client_raw.go` for `datadog api`. |
 | `config/` | Profiles on disk, environment overrides, read-only mode, site parsing. |
@@ -96,6 +97,44 @@ thin fetch in `cmd/` over a pure, tested analysis:
 Text output and `--json` come from the same structs: the text is a view of
 the numbers, never a separate computation.
 
+## Questions: find, investigate, review
+
+These commands take what a person says and do the correlating. Each is split
+into gathering (reads, concurrent, tolerant of failures) and judging (pure
+functions over a facts struct), so every rule is tested on synthetic facts.
+
+- **`find`** fans out over what can hold a name — services and operations
+  and endpoints (one spans aggregation each), log services, the catalog,
+  monitors, dashboards, SLOs, incidents, metrics, hosts — and scores each
+  candidate against the question's words: exact, stem, prefix, then edit
+  distance, so plurals and typos match.
+- **`investigate`** gathers facts (`invFacts`) and turns them into an
+  `investigation`. APM comes from trace metrics, not span searches: spans
+  allow five searches a minute, metrics six hundred per ten seconds, so
+  every APM question is a comma-separated batch of metric queries (the window
+  and the baseline, per endpoint, host, version and dependency), one call
+  each, answered by `query_index`. It runs in waves: resolve the target,
+  gather what doesn't depend on anything (series, logs, monitors, SLOs, the
+  catalog, org events), then the follow-ups that need the first answers
+  (the process's vitals on the busiest hosts, an example failing request, a
+  slow one). `DATADOG_DEBUG_TIMING=1` prints each call's duration to stderr.
+- **The analysis** judges each signal against the baseline with absolute
+  floors (a quiet service's one slow request isn't a spike), finds the onset,
+  and ranks leads by how close in time and how strong their evidence is: a
+  change just before the onset; everything spiking at once (the process or
+  its host, not a dependency); a heavy job at those moments; one dependency
+  or endpoint; a new error pattern, or an old one that grew; load. Each lead
+  carries evidence for and against and a command to verify it.
+- **References** (`refs.go`): every claim cites numbered links to the exact
+  view in Datadog with the same window, and the query behind it. A test
+  checks that every kind of link round-trips through `datadog read`.
+- **`monitors review`** reads every monitor with its transitions (the events
+  API, grouped per monitor and per group, with the flips a monitor makes in
+  one second when it's created collapsed into the change they add up to) and
+  its data rolled up like the monitor evaluates it. The rules propose fixes
+  as `monitors edit --option/--threshold` commands, which change one setting
+  and keep the rest.
+
 ## Decisions
 
 **A hand-rolled client instead of Datadog's generated SDK.** The official Go
@@ -149,6 +188,7 @@ blended from the real background and foreground, queried once at startup.
 | Layer | How |
 |---|---|
 | Analysis (`series`, `logpattern`, trace assembly, coverage gaps, link parsing) | Table and scenario tests on synthetic data. |
+| Questions (`find`, `investigate`, `monitors review`, spoken times) | Scenario tests on synthetic facts: a deploy then errors, latency spikes, a traffic drop, a quiet day; flapping, stuck, silent and loose monitors. |
 | UI | `tui/fakedd_test.go`: a harness types keys against a fake Datadog and asserts on each frame. |
 | Demo | `internal/demo`: monitor states match their data across a day. |
 | Setup | Key prompt model tests with a fake clipboard; the `e2e` build drives the real binary for recordings. |

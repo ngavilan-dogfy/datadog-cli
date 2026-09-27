@@ -22,6 +22,9 @@ same playbooks as a skill with `datadog skill install`.
 
 | You have | Run |
 |---|---|
+| A question ("why is checkout slow since 9?") | `datadog investigate <service> --since "today 09:00" --question "<their words>" --json` — see below |
+| Words, not names ("payments", "the order webhook") | `datadog find <words> --json` — what they are in Datadog, best first |
+| "Are our monitors any good?" | `datadog monitors review [--service <s>] --md` |
 | A Datadog link | `datadog read "<link>" --md` — keeps the link's window, variables and query |
 | A trace id | `datadog trace <id> --md` |
 | A service name | `datadog services context <service> --since 1h --json` |
@@ -47,6 +50,42 @@ permission, a product not enabled); the rest is still valid. Check
 `downtimes_active` before concluding that an alert is being ignored, and
 `audit_changes` for who changed what: an alert right after a monitor edit is
 rarely a coincidence.
+
+### From a question to a report
+
+People describe problems in their own words and times: *checkout has been
+failing since this morning*, *the order webhook was slow yesterday at six*.
+
+1. **Map the words.** When the service isn't named exactly, `datadog find
+   <words> --json` returns the services, endpoints, monitors, dashboards and
+   metrics they match, each with the command that reads it. Take the best
+   match; say which one you took.
+2. **Investigate.** `datadog investigate <service> [--resource "<endpoint>"]
+   --since "<their time>" --question "<their words>" --json`. Times can be
+   spoken (`"today 09:00"`, `yesterday`, `"ayer a las 18:00"`, `"hace 2h"`) or
+   centred: `--around "yesterday 18:00" --window 1h`. It compares with the day
+   before (`--compare 7d` for weekly patterns) and returns `summary`,
+   `status`, `onset`, `timeline`, `leads` (with `confidence`,
+   `evidence_for`, `evidence_against` and a `verify` command), `findings`,
+   `checked_normal`, `could_not_check`, `suggestions`, `next_steps` and
+   numbered `references` — links to the exact Datadog view and its query.
+3. **Verify before you repeat.** Run the top lead's `verify` command; read
+   the references behind the claims you'll make (`datadog read <url>`);
+   follow `next_steps` (a slow trace, the new log pattern) when the answer
+   isn't settled. A lead is a hypothesis until its evidence holds.
+4. **Report.** Answer the question first, in one or two sentences, then the
+   timeline, the leads with their confidence and evidence, and what was ruled
+   out. Cite references (`[3]`) for every number and keep their links. Give
+   times with their timezone and counts with their window. Say what couldn't
+   be checked instead of guessing. `datadog investigate … --md` is a ready
+   report to start from.
+5. **Propose improvements; apply none without a yes.** The investigation's
+   `suggestions` (the monitor that was missing, the one that alerted late),
+   `datadog monitors review --service <s>` (noisy, silent, stuck or loose
+   monitors, each with the `monitors edit … --option/--threshold` command
+   that fixes it), `datadog coverage --service <s>` (what nothing watches) and
+   `datadog dashboards read <id> --problems` (broken or empty widgets). Show
+   the commands; run them only when the user says so.
 
 ### Read descriptions, not raw data
 
@@ -108,10 +147,14 @@ is refused by read-only profiles.
   piped, tables in a terminal.
 - Failures exit 1 and go to stderr; with `--json`, stderr also gets one
   parseable line, `{"error":"..."}`.
-- `--from`, `--to` and `--around` take RFC3339 or epoch seconds/milliseconds;
-  `--since` and `--window` take durations (`30m`, `2h`, `1d`).
+- `--from`, `--to` and `--around` take RFC3339, epoch seconds/milliseconds,
+  or times as people say them, in local time (`yesterday 18:00`,
+  `monday 9am`, `2h ago`, `ayer a las 18:00`, `hace 2h`); `--since` takes a
+  duration (`30m`, `2h`, `1d`) or such a moment, `--window` a duration.
 - The client retries 429 and 5xx, waiting for Datadog's rate-limit window.
-  Don't add retries. Log search allows about three calls per ten seconds.
+  Don't add retries. Log search allows about three calls per ten seconds, and
+  span searches five a minute: prefer `investigate`, which reads APM from
+  metrics, to many `traces` calls.
 - JSON field names are stable: renaming one is a breaking change.
 
 ### Commands that change Datadog — ask first

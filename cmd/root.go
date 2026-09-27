@@ -33,11 +33,17 @@ Get started:
   datadog ui                        Dashboards, monitors, logs and metrics
   datadog ui --demo                 Look around a made-up org first (no keys)
 
+Ask it (times as people say them: "yesterday 18:00", "hace 2h"):
+  datadog find checkout payments    What a question's words are in Datadog: services, endpoints, monitors…
+  datadog investigate checkout      Why is it failing: correlates everything into a report with references
+  datadog monitors review           Which monitors are noisy, blind or loose, with the fix for each
+
 What's going on?
   datadog triage                    Alerts, incidents, errors and changes, in one call
   datadog services context api      One service: monitors, SLOs, errors, deploys
   datadog last                      What just fired, what was just deployed
   datadog correlate --around <time> Every signal around a moment
+  datadog events search "<q>"       Monitor transitions, deploys and resource changes
 
 Understand it (made for agents: facts instead of raw data, --md or --json):
   datadog read <link>               Any Datadog link, read with its window and variables

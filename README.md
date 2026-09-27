@@ -16,7 +16,7 @@ A fast terminal UI that draws dashboards the way Datadog does, and a CLI built f
 
 | For you | For scripts | For agents |
 |---|---|---|
-| `datadog ui`: your dashboards on Datadog's grid, monitors grouped by state, logs that tail live and a metrics explorer, refreshing on their own. | One output contract everywhere: tables in a terminal, TSV in a pipe, JSON with `--json`, errors on stderr, a non-zero exit on failure. | Commands that read Datadog into facts — any link, a trace, a chart, a dashboard, thousands of logs — and a Claude Code skill that knows when to use each. |
+| `datadog ui`: your dashboards on Datadog's grid, monitors grouped by state, logs that tail live and a metrics explorer, refreshing on their own. | One output contract everywhere: tables in a terminal, TSV in a pipe, JSON with `--json`, errors on stderr, a non-zero exit on failure. | Questions in plain words: `datadog investigate checkout` correlates everything into a report with references. Commands that read Datadog into facts — any link, a trace, a chart, a dashboard, thousands of logs — and a Claude Code skill that knows when to use each. |
 
 ## Install
 
@@ -100,6 +100,71 @@ Charts are drawn with braille dots, which are finer, or with blocks, which work 
 
 </details>
 
+## Asking it questions
+
+People ask *why is checkout failing since this morning?*, not `sum:trace.http.request.errors{service:checkout}`. Three commands start from the question and do the correlating:
+
+```console
+$ datadog investigate checkout --since "today 09:00" --question "why is checkout failing since this morning?"
+ Investigation · checkout (env:prod) · Sep 24 09:00 → 11:00 CEST
+ status: degraded · started 09:30 · compared with 1d before (Sep 23 09:00 → 11:00 CEST)
+
+ Summary
+   checkout: errors ×37.7 at 09:30 (0.2% → 7.5% of requests); error logs ×33.3 (5,000, 1d before: 150). Most
+   likely (high confidence): a change 5 min before it started: checkout: new instance web-3 (deploy, restart
+   or scale-out). "checkout error rate" alerted 20 min after it started.
+
+ Timeline (CEST)
+   09:25  deploy   checkout: new instance web-3 (deploy, restart or scale-out) [4]
+   09:30  logs     checkout: new error "payment authorization timed out after <num>ms" first logged [6]
+   09:30  onset    checkout: errors ×37.7 at 09:30 (0.2% → 7.5% of requests); error logs ×33.3 (5,000, 1d
+                   before: 150)
+   09:50  alert    monitor "checkout error rate" OK → Alert [7]
+
+ Leads
+   1. [high] A change 5 min before it started: checkout: new instance web-3 (deploy, restart or scale-out) [4]
+      + checkout: new instance web-3 (deploy, restart or scale-out) at 09:25, and the trouble started at 09:30
+   2. [high] The failure says: "payment authorization timed out after <num>ms" [6]
+   3. [medium] It's one endpoint: POST /orders [3]
+ …
+```
+
+| `datadog …` | What it answers |
+|---|---|
+| `find <words…>` | What are these words in Datadog? The services, endpoints, operations, monitors, dashboards, SLOs, incidents, metrics and hosts they match, best first, each with the command that reads it. Typos and plurals are fine. |
+| `investigate <service>` | Why is it failing — or is it? Traffic, errors and latency against the day before (the week before for longer windows); when it started; the endpoints and dependencies behind it; error logs that are new or grew; the process and its hosts (event loop, GC, CPU, memory); and everything that changed before it: new instances and versions, deploys, resource and configuration changes, alerts. Then leads ranked by confidence with the evidence for and against, what was checked and found normal, what couldn't be checked, the monitors that would have caught it sooner, and the next commands to run. A service name, an endpoint (`--resource`) or plain words (`datadog investigate payments checkout`) all work. |
+| `monitors review` | Are the monitors any good? Each monitor next to what it did in the last 30 days: the ones that notify no one, sit in Alert or No Data for days, watch a floor but go quiet when traffic stops completely, flap, never remind, judge cloud metrics before they arrive, never came close to their threshold, were made from a template and never filled in, or are muted with no end. Each finding comes with the `datadog monitors edit` command that fixes it. |
+| `events search <query>` | What changed, what fired? Monitor transitions, deploys and resource changes (a new Cloud Run revision, a configuration change), in one list. |
+
+**Times as people say them.** Every analysis command takes `--since 2h`, `--since yesterday`, `--from "yesterday 18:00" --to "today 09:00"` or `--around "today 09:40" --window 1h`, in English or Spanish (`"ayer a las 18:00"`, `"hace 2h"`, `"el lunes"`).
+
+**Reports with references.** `--md` writes a report for a ticket or a thread; `--json` gives an agent every fact. Each claim cites a numbered reference: a link to the exact Datadog view, with the same window and the query behind it. `datadog read <link>` reads any reference back, so an agent can check a claim before repeating it.
+
+**Improvements, not changes.** `investigate` suggests the monitors that were missing or late, and `monitors review` proposes fixes as commands:
+
+```console
+$ datadog monitors review --service checkout
+ Monitors review · the monitors of checkout · Aug 28 14:00 → Sep 27 14:00 CEST
+ 5 monitors · 6 alerts in the window · 2 to fix · 1 worth a look · 1 to tidy · 1 fine
+
+ To fix
+   ✗ [P1] checkout traffic below 100 requests/15m #119 · OK · 0 alerts · data 2400–38k over 7d
+     Watches a floor, but goes quiet when there's nothing at all — when requests (or whatever it counts) stop
+       completely the metric disappears instead of reaching zero: the monitor sees no data and tells no one —
+       the worst outage looks like silence
+       fix:   datadog monitors edit 119 --option on_missing_data=show_and_notify_no_data
+
+ Worth a look
+   ! checkout p95 latency #204 · OK · 6 alerts (18 min alerting)
+     Flaps: 6 alerts in 30d, 6 over within 15 minutes — an alert that's over before anyone looks is noise; a
+       recovery threshold short of the alert one, or a longer window, waits until it's real
+       fix:   datadog monitors edit 204 --threshold critical_recovery=0.64
+       check: datadog monitors explain 204 --since 7d
+ …
+```
+
+Nothing changes until the command runs: `monitors edit --option key=value` and `--threshold name=value` change one setting and keep the rest.
+
 ## Reading Datadog, for agents
 
 An agent can't look at a chart, and raw time series or log dumps are large, noisy and easy to misread. These commands do the reading and return facts that can be quoted, at a fraction of the size. Each one takes `--md` (for a prompt) and `--json` (with the numbers).
@@ -145,7 +210,7 @@ Every command follows the same contract, so scripts and agents can rely on it:
 
 - **stdout carries data only.** In a terminal, colored tables and charts; when piped, tab-separated values with a header row; with `--json` (most commands), JSON and nothing else.
 - **Failures** go to stderr and exit with status 1. With `--json`, stderr also gets one parseable line: `{"error":"..."}`.
-- **Time** is accepted as RFC3339 (`2026-05-19T09:30:00Z`) or epoch seconds/milliseconds; durations as `30m`, `2h`, `1d`. `NO_COLOR` is honored.
+- **Time** is accepted as RFC3339 (`2026-05-19T09:30:00Z`), epoch seconds/milliseconds, or as people say it (`yesterday 18:00`, `monday 9am`, `2h ago`, `ayer a las 18:00`, `hace 2h`), in local time; durations as `30m`, `2h`, `1d`. `NO_COLOR` is honored.
 - **Retries** are built in: 429 and 5xx responses are retried with backoff, and a 429 waits for Datadog's rate-limit window to reset. Don't add your own on top.
 - **Discovery**: `datadog schema` prints every command and flag as JSON, and marks the ones that change Datadog with `mutates: true`.
 
