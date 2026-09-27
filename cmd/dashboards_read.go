@@ -111,7 +111,12 @@ Examples:
 }
 
 func windowChanged(cmd *cobra.Command) bool {
-	return cmd.Flags().Changed("since") || cmd.Flags().Changed("from") || cmd.Flags().Changed("to")
+	for _, f := range []string{"since", "from", "to", "around", "window"} {
+		if cmd.Flags().Changed(f) {
+			return true
+		}
+	}
+	return false
 }
 
 // readDashboard is tui.ReadDashboard plus what the CLI knows on top: why a

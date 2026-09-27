@@ -3,7 +3,6 @@ package cmd
 import (
 	"fmt"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 
@@ -129,26 +128,9 @@ func resolveCorrelateWindow() (time.Time, time.Time, error) {
 	return to.Add(-15 * time.Minute), to, nil
 }
 
-func parseDate(s string) (time.Time, error) {
-	s = strings.TrimSpace(s)
-	// Pure number → epoch seconds or millis
-	if v, err := strconv.ParseInt(s, 10, 64); err == nil {
-		if len(s) >= 13 {
-			return time.UnixMilli(v), nil
-		}
-		return time.Unix(v, 0), nil
-	}
-	for _, layout := range []string{
-		time.RFC3339, time.RFC3339Nano,
-		"2006-01-02T15:04:05Z", "2006-01-02 15:04:05",
-		"2006-01-02T15:04", "2006-01-02",
-	} {
-		if v, err := time.Parse(layout, s); err == nil {
-			return v, nil
-		}
-	}
-	return time.Time{}, fmt.Errorf("unrecognized timestamp %q (try RFC3339 or epoch seconds/millis)", s)
-}
+// parseDate reads a moment: exact (RFC3339, epoch) or spoken ("yesterday
+// 18:00", "hace 2h"); see parseWhen.
+func parseDate(s string) (time.Time, error) { return parseWhen(s, time.Now()) }
 
 func printCorrelateTTY(from, to time.Time, events []datadog.Event, incs []datadog.IncidentData, sec *datadog.SecuritySignalsResponse, pi []datadog.CIPipelineEvent) {
 	fmt.Println(ui.Title.Render(fmt.Sprintf(" correlate · %s → %s",

@@ -51,7 +51,7 @@ Examples:
 		if err != nil {
 			return err
 		}
-		live := !cmd.Flags().Changed("to") && !cmd.Flags().Changed("from")
+		live := !cmd.Flags().Changed("to") && !cmd.Flags().Changed("from") && !cmd.Flags().Changed("around")
 		span, end, linked := l.window()
 		if linked && !windowChanged(cmd) {
 			live = end.IsZero()
